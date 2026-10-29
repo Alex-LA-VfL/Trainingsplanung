@@ -1,6 +1,6 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { makeCatalog, parseDay, planFor, HAUPTBLOECKE } from "../src/planungssprache.js";
+import { makeCatalog, parseDay, planFor, applyProfile, HAUPTBLOECKE } from "../src/planungssprache.js";
 import { readWorkbook, isoDay, TAGE } from "../src/excel.js";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -101,7 +101,7 @@ function showPending(user) {
     <p>Du bist angemeldet, aber noch nicht freigeschaltet. Schick deinem Trainer diesen Code:</p>
     <p><code id="uid">${esc(user.id)}</code></p>
     <div class="row"><button class="btn ghost" id="copy">Code kopieren</button></div>
-    <p class="small muted">Nur für die allererste Einrichtung durch den Planer (Supabase → SQL Editor):<br><code>insert into people (id, name, role) values ('${esc(user.id)}', 'Alex', 'planer');</code></p></div>`;
+  </div>`;
   document.getElementById("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(user.id); toast("Kopiert"); } catch { getSelection().selectAllChildren(document.getElementById("uid")); }
   };
@@ -138,7 +138,9 @@ async function dayForm(me, unit, onSaved) {
   const rm0 = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm0)) rm0[t.exercise_name] = Number(t.value);
   const items0 = (lines || []).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block }))
     .sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
-  const adj = applyDeviations(items0, rm0, devs || []);
+  const { data: prof } = me.profile_code ? await sb.from("profiles").select("*").eq("code", me.profile_code).maybeSingle() : { data: null };
+  const pr = applyProfile(items0, prof, me.sex);
+  const adj = applyDeviations(pr.items, rm0, devs || []);
   const plan = planFor(me.name, adj.items, adj.rm);
   const prev = new Map((entry?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}|${i.actual?.set || ""}`, i]));
   const st = { befinden: new Set(entry?.befinden?.length ? entry.befinden : [entry?.status && entry.status !== "eingeschränkt" ? entry.status : "fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
@@ -363,13 +365,18 @@ async function releasePane() {
 async function peoplePane() {
   const $p = document.getElementById("pane");
   const { data: people } = await sb.from("people").select("*").order("role").order("name");
+  const { data: profiles } = await sb.from("profiles").select("*").order("code");
+  const PROF = (profiles || []).map((x) => x.code);
+  const IMPL = ["Kugel", "Diskus", "Speer", "Hammer"];
   $p.innerHTML = `<div class="card"><h3>Personen</h3>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Trainingstage</th><th>Profil</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${x.role === "athletin" ? `<div class="chips daysel" data-pid="${esc(x.id)}">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${!!x.training_days?.includes(i + 1)}">${w}</button>`).join("")}</div><span class="small muted">${daysText(x.training_days)}</span>` : ""}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Trainingstage</th><th>Profil · w/m</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${x.role === "athletin" ? `<div class="chips daysel" data-pid="${esc(x.id)}">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${!!x.training_days?.includes(i + 1)}">${w}</button>`).join("")}</div><span class="small muted">${daysText(x.training_days)}</span>` : ""}</td><td>${x.role === "athletin" ? `<select class="psel" data-pid="${esc(x.id)}" data-f="profile_code"><option value="">–</option>${PROF.map((c) => `<option ${c === x.profile_code ? "selected" : ""}>${esc(c)}</option>`).join("")}</select> <select class="psel" data-pid="${esc(x.id)}" data-f="sex"><option value="">w/m</option><option value="w" ${x.sex === "w" ? "selected" : ""}>w</option><option value="m" ${x.sex === "m" ? "selected" : ""}>m</option></select>` : ""}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
     <form id="rf" class="row" hidden><span id="rname"></span><input id="rpw" minlength="8" required placeholder="Vorläufiges Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Setzen</button></form></div>
     <div class="card"><h3>Person freischalten</h3><p class="muted small">Die Athletin meldet sich einmal mit ihrer E-Mail an und schickt dir den angezeigten Code.</p>
     <form id="pf" class="row"><input id="pid" required placeholder="Code (ID)" style="flex:2 1 240px"><input id="pname" required placeholder="Name wie im Plan" style="flex:1 1 120px">
     <select id="prole"><option value="athletin">Athletin</option><option value="cotrainer">Co-Trainer</option></select>
-    <span class="small">Tage</span><div class="chips" id="pdays">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="false">${w}</button>`).join("")}</div><input id="pprof" placeholder="Profil (U18)" style="width:110px"><label class="small">Einwilligung <input type="date" id="pcons"></label><button class="btn">Freischalten</button></form></div>`;
+    <span class="small">Tage</span><div class="chips" id="pdays">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="false">${w}</button>`).join("")}</div><select id="pprof"><option value="">Profil</option>${PROF.map((c) => `<option>${esc(c)}</option>`).join("")}</select><select id="psex"><option value="">w/m</option><option value="w">w</option><option value="m">m</option></select><label class="small">Einwilligung <input type="date" id="pcons"></label><button class="btn">Freischalten</button></form></div>
+    <div class="card"><h3>Profile</h3><p class="small muted">Umfang: Wiederholungen bei Kraft und Sprüngen in Prozent des Gruppenplans. Prozentwerte der Last bleiben gleich und beziehen sich auf den eigenen Maximaltest. Geräte erscheinen bei der Technik passend zu w/m.</p>
+    <div class="tablewrap"><table><thead><tr><th>Profil</th><th>Umfang %</th>${IMPL.map((i) => `<th>${i} w / m</th>`).join("")}<th>gesperrte Übungen</th><th></th></tr></thead><tbody>${(profiles || []).map((x) => `<tr data-code="${esc(x.code)}"><td><b>${esc(x.code)}</b></td><td><input class="pf-f" type="number" step="5" value="${Math.round(Number(x.volume_factor) * 100)}" style="width:70px"></td>${IMPL.map((i) => `<td><input class="pf-i" data-i="${i}" data-s="w" value="${esc(x.implements?.[i]?.w || "")}" style="width:64px"> <input class="pf-i" data-i="${i}" data-s="m" value="${esc(x.implements?.[i]?.m || "")}" style="width:64px"></td>`).join("")}<td><input class="pf-b" value="${esc((x.blocked || []).join(", "))}" placeholder="Name wie im Katalog"></td><td><button class="btn ghost pf-save">Speichern</button></td></tr>`).join("")}</tbody></table></div></div>`;
   let resetId = null;
   $p.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => {
     resetId = b.dataset.reset; const f = document.getElementById("rf"); f.hidden = false;
@@ -390,10 +397,21 @@ async function peoplePane() {
     if (error) return toast("Nicht gespeichert: " + error.message);
     g.nextElementSibling.textContent = daysText(days); toast("Trainingstage gespeichert");
   })));
+  $p.querySelectorAll(".psel").forEach((sel) => (sel.onchange = async () => {
+    const { error } = await sb.from("people").update({ [sel.dataset.f]: sel.value || null }).eq("id", sel.dataset.pid);
+    toast(error ? "Nicht gespeichert: " + error.message : "Gespeichert");
+  }));
+  $p.querySelectorAll(".pf-save").forEach((b) => (b.onclick = async () => {
+    const tr = b.closest("tr"); const implements = {};
+    tr.querySelectorAll(".pf-i").forEach((i) => { if (i.value.trim()) (implements[i.dataset.i] ||= {})[i.dataset.s] = i.value.trim(); });
+    const row = { volume_factor: Number(tr.querySelector(".pf-f").value) / 100, implements, blocked: tr.querySelector(".pf-b").value.split(",").map((x) => x.trim()).filter(Boolean) };
+    const { error } = await sb.from("profiles").update(row).eq("code", tr.dataset.code);
+    toast(error ? "Nicht gespeichert: " + error.message : `Profil ${tr.dataset.code} gespeichert`);
+  }));
   document.getElementById("pf").onsubmit = async (e) => {
     e.preventDefault();
     const row = { id: document.getElementById("pid").value.trim(), name: document.getElementById("pname").value.trim(), role: document.getElementById("prole").value,
-      profile_code: document.getElementById("pprof").value.trim() || null, consent_on: document.getElementById("pcons").value || null,
+      profile_code: document.getElementById("pprof").value || null, sex: document.getElementById("psex").value || null, consent_on: document.getElementById("pcons").value || null,
       training_days: [...document.querySelectorAll('#pdays [aria-pressed="true"]')].map((b) => +b.dataset.d) };
     if (!row.training_days.length) row.training_days = null;
     const { error } = await sb.from("people").insert(row);
@@ -483,7 +501,8 @@ async function deviationForm(box, me, people, athleteId = null, reason = "Wieder
 // ───────────── Tagebuch je Athletin (Trainer) ─────────────
 async function diaryPane(me) {
   const $p = document.getElementById("pane");
-  const { data: people } = await sb.from("people").select("id,name,training_days").eq("role", "athletin").eq("active", true).order("name");
+  const { data: people } = await sb.from("people").select("id,name,training_days,profile_code,sex").eq("role", "athletin").eq("active", true).order("name");
+  const { data: profiles } = await sb.from("profiles").select("*");
   if (!(people || []).length) return ($p.innerHTML = `<div class="card"><p class="muted">Noch keine Athletinnen freigeschaltet.</p></div>`);
   let sel = diaryPane.sel && people.find((p) => p.id === diaryPane.sel) ? diaryPane.sel : people[0].id;
   $p.innerHTML = `<div class="row"><div class="chips" id="dpa">${people.map((p) => `<button type="button" data-id="${esc(p.id)}" aria-pressed="${p.id === sel}">${esc(p.name)}</button>`).join("")}</div>
@@ -507,7 +526,8 @@ async function diaryPane(me) {
   document.getElementById("dplist").innerHTML = units.map((u) => {
     const e = (entries || []).find((x) => x.unit_id === u.id);
     const its = (lines || []).filter((l) => l.unit_id === u.id).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block })).sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
-    const adj = applyDeviations(its, rm0, (devs || []).filter((d) => d.unit_id === u.id));
+    const pr = applyProfile(its, (profiles || []).find((x) => x.code === ath.profile_code), ath.sex);
+    const adj = applyDeviations(pr.items, rm0, (devs || []).filter((d) => d.unit_id === u.id));
     const plan = planFor(ath.name, adj.items, adj.rm);
     const di = new Map((e?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}`, i]));
     const blocks = []; for (const x of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === x.block) l.items.push(x); else blocks.push({ block: x.block, items: [x] }); }

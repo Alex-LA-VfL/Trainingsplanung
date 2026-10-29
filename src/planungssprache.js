@@ -274,3 +274,39 @@ export function planFor(athlete, dayItems, rm = {}, { markMissing = true } = {})
   }
   return out;
 }
+
+/**
+ * Profilregeln anwenden (vor planFor): Wiederholungen bei Kraft und Sprüngen skalieren,
+ * gesperrte Übungen entfernen, Gerätegewicht bei der Technik ergänzen.
+ * Prozentwerte bleiben unverändert – sie beziehen sich auf den individuellen Maximaltest.
+ */
+export function applyProfile(items, profile, sex) {
+  if (!profile) return { items, note: null };
+  const f = Number(profile.volume_factor) || 1;
+  const r = (x) => Math.max(1, Math.round(x * f));
+  const blocked = new Set((profile.blocked || []).map((b) => b.toLowerCase()));
+  const isBlocked = (ex, raw) => blocked.has(String(ex?.name || raw || "").toLowerCase());
+  const out = [];
+  for (const src of items) {
+    const p = JSON.parse(JSON.stringify(src));
+    if (p.type === "strength" || p.type === "test") {
+      p.items = p.items.filter((i) => !isBlocked(i.exercise, i.raw));
+      if (!p.items.length) continue;
+      if (p.type === "strength" && f !== 1) {
+        p.setGroups = p.setGroups.map((g) => ({ ...g, reps: r(g.reps) }));
+        p.items.forEach((i) => { if (i.reps) i.reps = r(i.reps); });
+      }
+    } else if (p.type === "series" && f !== 1 && p.block === "Sprünge") {
+      if (p.reps) p.reps = r(p.reps);
+      p.items.forEach((i) => { if (i.count) i.count = r(i.count); });
+    } else if (p.type === "technique" && sex) {
+      p.groups.forEach((g) => {
+        const imp = profile.implements?.[g.disc]?.[sex];
+        if (imp) g.hint = [g.hint, imp].filter(Boolean).join(" · ");
+      });
+    } else if (["free", "time", "count", "runs", "sequence"].includes(p.type) && isBlocked(p.exercise, p.rawName)) continue;
+    out.push(p);
+  }
+  const note = f !== 1 ? `Profil ${profile.code}: Wiederholungen bei Kraft und Sprüngen ${Math.round(f * 100)} %` : null;
+  return { items: out, note };
+}
