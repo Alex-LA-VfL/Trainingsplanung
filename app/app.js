@@ -402,9 +402,9 @@ async function peoplePane() {
     toast(error ? "Nicht gespeichert: " + error.message : "Gespeichert");
   }));
   $p.querySelectorAll(".pf-save").forEach((b) => (b.onclick = async () => {
-    const tr = b.closest("tr"); const implements = {};
-    tr.querySelectorAll(".pf-i").forEach((i) => { if (i.value.trim()) (implements[i.dataset.i] ||= {})[i.dataset.s] = i.value.trim(); });
-    const row = { volume_factor: Number(tr.querySelector(".pf-f").value) / 100, implements, blocked: tr.querySelector(".pf-b").value.split(",").map((x) => x.trim()).filter(Boolean) };
+    const tr = b.closest("tr"); const impl = {};
+    tr.querySelectorAll(".pf-i").forEach((i) => { if (i.value.trim()) (impl[i.dataset.i] ||= {})[i.dataset.s] = i.value.trim(); });
+    const row = { volume_factor: Number(tr.querySelector(".pf-f").value) / 100, implements: impl, blocked: tr.querySelector(".pf-b").value.split(",").map((x) => x.trim()).filter(Boolean) };
     const { error } = await sb.from("profiles").update(row).eq("code", tr.dataset.code);
     toast(error ? "Nicht gespeichert: " + error.message : `Profil ${tr.dataset.code} gespeichert`);
   }));
