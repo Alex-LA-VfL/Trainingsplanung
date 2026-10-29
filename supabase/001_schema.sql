@@ -171,10 +171,9 @@ alter table public.tests            enable row level security;
 alter table public.results          enable row level security;
 alter table public.comments         enable row level security;
 
--- Personen: volle Daten sieht nur die Person selbst und der Trainer; Namen für alle über die Sicht people_names
+-- Personen: volle Daten sieht nur die Person selbst und der Trainer; Namen für alle Angemeldeten über die Funktion people_names()
 create policy people_read  on public.people for select to authenticated using (id = auth.uid() or public.is_trainer());
-create view public.people_names as select id, name, role from public.people where active;
-grant select on public.people_names to authenticated;
+-- Namensliste: siehe Funktion people_names() in 002_people_names_absichern.sql
 create policy people_write on public.people for all    to authenticated using (public.is_planer()) with check (public.is_planer());
 
 -- Katalog und Kalender: lesen alle, schreiben Planer
