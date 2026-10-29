@@ -31,8 +31,9 @@ async function start() {
   });
   if (!session) return showLogin();
   const { data: me, error } = await sb.from("people").select("*").eq("id", session.user.id).maybeSingle();
-  $who.innerHTML = `<span>${esc(me?.name || session.user.email)}</span><button id="logout">Abmelden</button>`;
+  $who.innerHTML = `<span>${esc(me?.name || session.user.email)}</span><button id="pwset">Passwort</button><button id="logout">Abmelden</button>`;
   document.getElementById("logout").onclick = () => sb.auth.signOut();
+  document.getElementById("pwset").onclick = showPasswordForm;
   if (error) return ($app.innerHTML = `<div class="card"><p>Fehler beim Laden: ${esc(error.message)}</p></div>`);
   if (!me || !me.active) return showPending(session.user);
   if (me.role === "athletin") return athleteView(me);
@@ -73,6 +74,19 @@ function showLogin() {
     }
     if (!data.session) { $msg.textContent = "Konto angelegt, aber noch nicht aktiv: In Supabase muss „Confirm email“ ausgeschaltet sein."; return; }
     location.reload();
+  };
+}
+
+function showPasswordForm() {
+  const box = document.createElement("div");
+  box.className = "card"; box.style.maxWidth = "460px";
+  box.innerHTML = `<h2>Passwort festlegen</h2><form id="pwf" class="row"><input id="npw" type="password" minlength="8" required autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Speichern</button></form>`;
+  $app.prepend(box);
+  box.querySelector("form").onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.auth.updateUser({ password: box.querySelector("#npw").value });
+    if (error) return toast("Nicht gespeichert: " + error.message);
+    toast("Passwort gespeichert"); box.remove();
   };
 }
 
