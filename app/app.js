@@ -50,7 +50,7 @@ function showLogin() {
     </form>
     <p class="small"><a href="#" id="toggle">Neu hier? Konto anlegen</a></p>
     <p class="small muted" id="lmsg"></p>
-    <p class="small muted">Passwort vergessen? Sag deinem Trainer Bescheid.</p></div>`;
+    <p class="small muted">Passwort vergessen? Dein Trainer setzt dir ein neues; deine Einträge bleiben erhalten.</p></div>`;
   let mode = "login";
   const $msg = document.getElementById("lmsg");
   document.getElementById("toggle").onclick = (e) => {
@@ -326,11 +326,24 @@ async function peoplePane() {
   const $p = document.getElementById("pane");
   const { data: people } = await sb.from("people").select("*").order("role").order("name");
   $p.innerHTML = `<div class="card"><h3>Personen</h3>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Profil</th><th>Einwilligung</th><th>aktiv</th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.active ? "ja" : "nein"}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Profil</th><th>Einwilligung</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <form id="rf" class="row" hidden><span id="rname"></span><input id="rpw" minlength="8" required placeholder="Vorläufiges Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Setzen</button></form></div>
     <div class="card"><h3>Person freischalten</h3><p class="muted small">Die Athletin meldet sich einmal mit ihrer E-Mail an und schickt dir den angezeigten Code.</p>
     <form id="pf" class="row"><input id="pid" required placeholder="Code (ID)" style="flex:2 1 240px"><input id="pname" required placeholder="Name wie im Plan" style="flex:1 1 120px">
     <select id="prole"><option value="athletin">Athletin</option><option value="cotrainer">Co-Trainer</option></select>
     <input id="pprof" placeholder="Profil (U18)" style="width:110px"><label class="small">Einwilligung <input type="date" id="pcons"></label><button class="btn">Freischalten</button></form></div>`;
+  let resetId = null;
+  $p.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => {
+    resetId = b.dataset.reset; const f = document.getElementById("rf"); f.hidden = false;
+    document.getElementById("rname").textContent = `Neues Passwort für ${b.dataset.name}:`; document.getElementById("rpw").focus();
+  }));
+  document.getElementById("rf").onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.rpc("reset_password", { target: resetId, new_password: document.getElementById("rpw").value });
+    if (error) return toast("Nicht gesetzt: " + error.message);
+    toast("Passwort gesetzt. Gib es der Athletin weiter; sie kann es danach unter „Passwort“ ändern.");
+    document.getElementById("rf").hidden = true; document.getElementById("rpw").value = "";
+  };
   document.getElementById("pf").onsubmit = async (e) => {
     e.preventDefault();
     const row = { id: document.getElementById("pid").value.trim(), name: document.getElementById("pname").value.trim(), role: document.getElementById("prole").value,
