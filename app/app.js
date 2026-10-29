@@ -23,7 +23,12 @@ async function cat() {
 // ───────────── Anmeldung ─────────────
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
-  sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") location.reload(); });
+  // Nur bei echtem Wechsel neu laden: Supabase meldet SIGNED_IN auch beim Wiederherstellen einer bestehenden Sitzung
+  const hadSession = !!session;
+  sb.auth.onAuthStateChange((ev) => {
+    if (ev === "SIGNED_OUT" && hadSession) location.reload();
+    if (ev === "SIGNED_IN" && !hadSession) location.reload();
+  });
   if (!session) return showLogin();
   const { data: me, error } = await sb.from("people").select("*").eq("id", session.user.id).maybeSingle();
   $who.innerHTML = `<span>${esc(me?.name || session.user.email)}</span><button id="logout">Abmelden</button>`;
