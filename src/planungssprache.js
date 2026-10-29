@@ -14,6 +14,7 @@ export const HAUPTBLOECKE = [
 export const DOKU = {
   "Kraft Langhantel": "je Übung", "Spezielle Kraft": "je Übung",
   "Kräftigung": "Set", "Sprünge": "Set", "Zirkel": "Set",
+  "Sprint": "Set", "Tempoläufe": "Set", "Ausdauer": "Set", "MedBälle groß": "Set", "MedBälle klein": "Set",
   "Technik": "Würfe", "Spezielle Würfe": "Würfe",
 };
 
@@ -193,7 +194,7 @@ export function parseDay(cells, cat, athletes = []) {
       const p = parseLine(line, cat);
       p.block = p.blockOverride || c.block; p.cell = c.cell;
       for (const u of unknownExercises(p)) problems.push({ level: "Fehler", text: `„${u}“ ist nicht im Übungskatalog`, cell: c.cell });
-      if (athletes.length) for (const n of namesIn(p)) if (!athletes.includes(n)) problems.push({ level: "Fehler", text: `Unbekannter Name „${n}“`, cell: c.cell });
+      if (athletes.length) for (const n of namesIn(p)) if (!athletes.includes(n)) problems.push({ level: "Hinweis", text: `„${n}“ ist noch nicht freigeschaltet oder falsch geschrieben`, cell: c.cell });
       if (p.type === "free" && !p.exercise) { /* schon gemeldet */ }
       items.push(p);
     }

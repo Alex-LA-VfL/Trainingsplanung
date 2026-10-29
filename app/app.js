@@ -11,8 +11,9 @@ const toast = (t) => { const el = document.getElementById("toast"); el.textConte
 const dShort = (iso) => { const d = new Date(iso + "T12:00:00"); return `${TAGE[(d.getDay() + 6) % 7]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`; };
 const RATE = ["leicht", "ok", "fordernd", "schwer", "am Limit"];
 const CHIPS_TECHNIK = ["müde", "unkonzentriert", "Technik gut umgesetzt", "powervoll", "Spaß gehabt"];
-const CHIPS_NEBEN = ["wenig Schlaf", "Schule/Prüfung", "Ärger", "kein Bock", "Yeah"];
-const STATUS = ["fit", "eingeschränkt", "krank", "verletzt"];
+const CHIPS_NEBEN = ["wenig Schlaf", "Schule/Prüfung", "Ärger", "unglücklich", "kein Bock", "Alles supi!"];
+const STATUS = ["fit", "müde", "gestresst", "Muskelkater", "krank", "verletzt"];
+const SET_RATED = new Set(["Spezielle Würfe"]); // zusätzlich zu allen Blöcken mit Doku „Set“
 
 let catalog = null;
 async function cat() {
@@ -122,16 +123,18 @@ async function athleteView(me) {
 
 async function dayForm(me, unit, onSaved) {
   const $d = document.getElementById("day");
-  const [{ data: lines }, { data: entry }, { data: cal }] = await Promise.all([
+  const [{ data: lines }, { data: entry }, { data: cal }, { data: tests }] = await Promise.all([
     sb.from("plan_lines").select("*").eq("unit_id", unit.id),
     sb.from("diary_entries").select("*, diary_items(*)").eq("athlete_id", me.id).eq("unit_id", unit.id).maybeSingle(),
     sb.from("calendar_entries").select("*").lte("date_from", unit.date).gte("date_to", unit.date),
+    sb.from("tests").select("exercise_name,value,date").eq("athlete_id", me.id).eq("test_type", "1RM").order("date", { ascending: false }),
   ]);
+  const rm = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm)) rm[t.exercise_name] = Number(t.value);
   const items = (lines || []).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block }))
     .sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
-  const plan = planFor(me.name, items);
+  const plan = planFor(me.name, items, rm);
   const prev = new Map((entry?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}|${i.actual?.set || ""}`, i]));
-  const st = { status: entry?.status || "fit", day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
+  const st = { befinden: new Set(entry?.befinden?.length ? entry.befinden : [entry?.status && entry.status !== "eingeschränkt" ? entry.status : "fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
 
   // Blöcke in Planreihenfolge bündeln
   const blocks = [];
@@ -140,29 +143,32 @@ async function dayForm(me, unit, onSaved) {
   const pills = [...(cal || []).map((c) => `<span class="pill ${c.kind === "Feiertag" ? "bad" : c.kind === "Schulferien" ? "warn" : "ok"}">${esc(c.title)}</span>`),
     unit.week_hint ? `<span class="pill">${esc(unit.week_hint)}</span>` : "", changed ? `<span class="pill warn">nach Freigabe geändert</span>` : ""].join("");
 
-  const rateHTML = (key, val) => `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}">${i + 1}<br>${r}</button>`).join("")}</div>`;
+  const rateHTML = (key, val) => `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}" title="${r}" aria-label="${i + 1} ${r}">${i + 1}</button>`).join("")}<span class="rlabel">${val ? RATE[val - 1] : ""}</span></div>`;
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
 
   let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${pills}</div>`;
-  html += `<div class="card"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, new Set([st.status]))}</div>`;
+  html += `<div class="card"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
   blocks.forEach((b, bi) => {
-    html += `<section class="blk"><h3>${esc(b.block)}<small>${b.doku === "Set" ? "als Set bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></h3>`;
+    html += `<section class="blk"><h3>${esc(b.block)}<small>${b.doku === "Set" ? "als Block bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></h3>`;
     b.items.forEach((e, ii) => {
       const key = `${e.lineId}|${e.name}|`;
       const old = prev.get(key);
       html += `<div class="item"><div class="ihead"><span class="iname">${e.replaced ? `<span class="tag">statt ${esc(e.replaced)}</span>` : ""}${esc(e.name)}</span><span class="idose">${esc(e.dose)}</span></div>`;
       if (e.detail || e.note) html += `<div class="idetail">${esc([e.detail, e.note].filter(Boolean).join(" · "))}</div>`;
-      if (b.doku === "je Übung" && !e.test) html += `<label class="ist">Ist <input data-ist="${esc(key)}" value="${esc(old?.actual?.ist ?? e.dose)}"></label>${rateHTML("i:" + key, old?.rating || null)}`;
-      else if (e.test) html += `<label class="ist">Ergebnis kg <input data-ist="${esc(key)}" inputmode="decimal" value="${esc(old?.actual?.ist ?? "")}"></label>`;
+      if (b.doku === "je Übung" && !e.test) {
+        const planKg = (e.dose.match(/([\d]+(?:,\d+)?) kg/) || [])[1] || "";
+        html += `<div class="ist"><label>Ist <input data-ist="${esc(key)}" value="${esc(old?.actual?.ist ?? e.dose.split(" · ")[0])}"></label><label>kg <input data-kg="${esc(key)}" inputmode="decimal" style="width:76px" placeholder="kg" value="${esc(old?.actual?.kg ?? planKg)}"></label></div>${rateHTML("i:" + key, old?.rating || null)}`;
+      }
+      else if (e.test) html += `<label class="ist">Maximalgewicht kg <input data-test="${esc(e.name)}" data-ist="${esc(key)}" inputmode="decimal" value="${esc(old?.actual?.ist ?? "")}"></label>`;
       else if (b.doku === "Würfe") {
         const rows = old?.actual?.wuerfe?.length ? old.actual.wuerfe : [{ form: "", geraet: "", n: "" }];
         html += `<div class="throws" data-throws="${esc(key)}">${rows.map((r) => `<div class="tr"><input placeholder="Wurfform" value="${esc(r.form)}"><input placeholder="Gerät" value="${esc(r.geraet)}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n)}"></div>`).join("")}<button type="button" class="btn ghost" data-addrow>+ Wurfform</button></div>${chipHTML("t:" + key, CHIPS_TECHNIK, new Set(old?.chips || []))}`;
-      } else if (b.doku !== "Set") html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done === false ? "" : "checked"}> erledigt</label>`;
+      } else if (b.doku !== "Set" && !SET_RATED.has(b.block)) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
       html += `</div>`;
     });
-    if (b.doku === "Set") {
+    if (b.doku === "Set" || SET_RATED.has(b.block)) {
       const sk = `${b.items[0].lineId}|SET:${b.block}|`;
-      html += `<div class="item"><span class="small muted">Wie schwer war ${b.block === "Zirkel" ? "der Zirkel" : "das Set"}?</span>${rateHTML("i:" + sk, prev.get(sk)?.rating || null)}</div>`;
+      html += `<div class="item setrate"><span class="small muted">Wie schwer war ${b.block === "Zirkel" ? "der Zirkel" : "der Block"}?</span>${rateHTML("i:" + sk, prev.get(sk)?.rating || null)}</div>`;
     }
     html += `</section>`;
   });
@@ -174,15 +180,20 @@ async function dayForm(me, unit, onSaved) {
   const ratings = new Map(); const chipSel = new Map();
   $d.querySelectorAll(".rate").forEach((g) => g.querySelectorAll("button").forEach((b) => (b.onclick = () => {
     g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); ratings.set(g.dataset.key, +b.dataset.v);
+    g.querySelector(".rlabel").textContent = RATE[+b.dataset.v - 1];
   })));
   $d.querySelectorAll(".rate").forEach((g) => { const s = g.querySelector('[aria-pressed="true"]'); if (s) ratings.set(g.dataset.key, +s.dataset.v); });
   $d.querySelectorAll(".chips").forEach((g) => {
-    const single = g.dataset.key === "status";
+    const isStatus = g.dataset.key === "status";
     chipSel.set(g.dataset.key, new Set([...g.querySelectorAll('[aria-pressed="true"]')].map((b) => b.dataset.v)));
     g.querySelectorAll("button").forEach((b) => (b.onclick = () => {
       const s = chipSel.get(g.dataset.key);
-      if (single) { s.clear(); g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false")); }
-      if (s.has(b.dataset.v) && !single) { s.delete(b.dataset.v); b.setAttribute("aria-pressed", "false"); } else { s.add(b.dataset.v); b.setAttribute("aria-pressed", "true"); }
+      if (s.has(b.dataset.v)) { s.delete(b.dataset.v); b.setAttribute("aria-pressed", "false"); } else { s.add(b.dataset.v); b.setAttribute("aria-pressed", "true"); }
+      if (isStatus) { // „fit“ schließt alles andere aus
+        if (b.dataset.v === "fit" && s.has("fit")) [...s].forEach((v) => v !== "fit" && s.delete(v));
+        if (b.dataset.v !== "fit") s.delete("fit");
+        g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(s.has(x.dataset.v))));
+      }
     }));
   });
   $d.querySelectorAll("[data-addrow]").forEach((b) => (b.onclick = () => {
@@ -195,7 +206,9 @@ async function dayForm(me, unit, onSaved) {
     const dayRating = ratings.get("day");
     if (!dayRating) return toast("Bitte den Trainingstag gesamt bewerten");
     const btn = document.getElementById("save"); btn.disabled = true;
-    const row = { athlete_id: me.id, unit_id: unit.id, status: [...chipSel.get("status")][0] || "fit", day_rating: dayRating,
+    const bef = [...chipSel.get("status")];
+    const status = bef.includes("verletzt") ? "verletzt" : bef.includes("krank") ? "krank" : bef.find((v) => v !== "fit") || "fit";
+    const row = { athlete_id: me.id, unit_id: unit.id, status, befinden: bef.length ? bef : ["fit"], day_rating: dayRating,
       chips: [...(chipSel.get("neben") || [])], note: document.getElementById("note").value.trim() || null, updated_at: new Date().toISOString() };
     const { data: saved, error } = await sb.from("diary_entries").upsert(row, { onConflict: "athlete_id,unit_id" }).select("id").single();
     if (error) { btn.disabled = false; return toast("Speichern fehlgeschlagen: " + error.message); }
@@ -206,6 +219,14 @@ async function dayForm(me, unit, onSaved) {
       const key = inp.dataset.ist; const ex = out.find((o) => `${o.plan_line_id}|${o.actual.name}|` === key);
       if (ex) ex.actual.ist = inp.value; else out.push({ diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: key.split("|")[1], ist: inp.value } });
     });
+    $d.querySelectorAll("[data-kg]").forEach((inp) => {
+      const key = inp.dataset.kg; const ex = out.find((o) => `${o.plan_line_id}|${o.actual.name}|` === key);
+      const kg = inp.value.trim() ? Number(inp.value.replace(",", ".")) : null;
+      if (ex) ex.actual.kg = kg; else out.push({ diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: key.split("|")[1], kg } });
+    });
+    const testRows = [...$d.querySelectorAll("[data-test]")].filter((i) => i.value.trim()).map((i) => ({ athlete_id: me.id, date: unit.date, test_type: "1RM",
+      exercise_name: i.dataset.test, value: Number(i.value.replace(",", ".")), unit: "kg", context: "Test", created_by: me.id }));
+    if (testRows.length) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) toast("Testwerte nicht gespeichert: " + et.message); }
     $d.querySelectorAll("[data-done]").forEach((cb) => out.push({ diary_id: saved.id, plan_line_id: lineOf(cb.dataset.done), actual: { name: cb.dataset.done.split("|")[1], done: cb.checked } }));
     $d.querySelectorAll("[data-throws]").forEach((w) => {
       const key = w.dataset.throws;
@@ -240,6 +261,7 @@ async function feedbackPane() {
     sb.from("units").select("id,date,slot,released").gte("date", since).lte("date", today).eq("released", true).order("date"),
     sb.from("diary_entries").select("*, units(date,slot)").gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }),
   ]);
+  const { data: openTests } = await sb.from("tests").select("*").eq("confirmed", false).order("date", { ascending: false });
   // Hinweis Wiedereinstieg: die letzten 3 freigegebenen Einheiten krank/verletzt oder nicht dokumentiert
   const last3 = (units || []).slice(-3);
   const hints = (people || []).map((p) => {
@@ -248,7 +270,12 @@ async function feedbackPane() {
   }).filter((h) => last3.length >= 3 && h.miss >= 3);
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
   $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten krank, verletzt oder nicht dokumentiert. Plan vor der nächsten Freigabe anpassen.</p>`).join("")}</div>` : ""}
-    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${e.status === "fit" ? "fit" : `<span class="pill ${e.status === "eingeschränkt" ? "warn" : "bad"}">${esc(e.status)}</span>`}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+    ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
+    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${(e.befinden?.length ? e.befinden : [e.status]).map((v) => v === "fit" ? "fit" : `<span class="pill ${["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join(" ")}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+  $p.querySelectorAll("[data-confirm]").forEach((b) => (b.onclick = async () => {
+    const { error } = await sb.from("tests").update({ confirmed: true }).eq("id", +b.dataset.confirm);
+    if (error) return toast(error.message); toast("Bestätigt"); feedbackPane();
+  }));
 }
 
 async function uploadPane(me) {
@@ -264,17 +291,18 @@ async function uploadPane(me) {
     const c = await cat();
     const { data: ppl } = await sb.from("people").select("name").eq("role", "athletin");
     const athletes = (ppl || []).map((p) => p.name);
+    const notYet = data.athletes.filter((n) => !athletes.includes(n));
     const days = []; const problems = [];
     for (const w of data.weeks) w.days.forEach((d, di) => {
       d.cells.filter((x) => !HAUPTBLOECKE.includes(x.block)).forEach((x) => problems.push({ level: "Fehler", text: `Unbekannter Hauptblock „${x.block}“`, cell: x.cell, where: `KW ${w.kw} ${TAGE[di]}` }));
-      const r = parseDay(d.cells, c, athletes.length ? athletes : data.athletes);
+      const r = parseDay(d.cells, c, [...new Set([...athletes, ...data.athletes])]);
       r.problems.forEach((p) => problems.push({ ...p, where: `KW ${w.kw} ${TAGE[di]}` }));
       if (d.date) days.push({ w, d, items: r.items });
     });
     const errs = problems.filter((p) => p.level === "Fehler");
     const lines = days.reduce((a, x) => a + x.items.length, 0);
     $r.innerHTML = `<p><b>${data.weeks.length}</b> Wochen · <b>${days.filter((x) => x.items.length).length}</b> Trainingstage · <b>${lines}</b> Zeilen · <b>${errs.length}</b> Fehler · <b>${problems.length - errs.length}</b> Hinweise</p>
-      ${problems.map((p) => `<div class="prob"><span class="pill ${p.level === "Fehler" ? "bad" : "warn"}">${p.level}</span><span>${esc(p.where)}: ${esc(p.text)}</span><code>${esc(p.cell || "")}</code></div>`).join("")}
+      ${notYet.length ? `<p class="small muted">Noch nicht freigeschaltet: ${esc(notYet.join(", "))}. Ihr Plan wird trotzdem übernommen und erscheint, sobald du sie unter „Personen“ freischaltest.</p>` : ""}${problems.map((p) => `<div class="prob"><span class="pill ${p.level === "Fehler" ? "bad" : "warn"}">${p.level}</span><span>${esc(p.where)}: ${esc(p.text)}</span><code>${esc(p.cell || "")}</code></div>`).join("")}
       <div class="row"><button class="btn" id="go" ${errs.length ? "disabled" : ""}>In die Datenbank übernehmen</button>${errs.length ? `<span class="small muted">Erst die Fehler in der Excel beheben.</span>` : ""}</div><p class="small muted" id="prog"></p>`;
     if (errs.length) return;
     document.getElementById("go").onclick = async () => {
