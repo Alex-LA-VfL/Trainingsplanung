@@ -75,3 +75,4 @@ code{font:13px var(--f-mono);background:var(--code);padding:1px 5px;border-radiu
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:10;max-width:90vw}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .adj{border-color:var(--mark);background:var(--mark-soft)}
+.daysel button{padding:3px 7px;font-size:12px}

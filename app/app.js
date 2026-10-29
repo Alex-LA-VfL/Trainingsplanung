@@ -12,6 +12,10 @@ const dShort = (iso) => { const d = new Date(iso + "T12:00:00"); return `${TAGE[
 const RATE = ["leicht", "ok", "fordernd", "schwer", "am Limit"];
 const CHIPS_TECHNIK = ["müde", "unkonzentriert", "Technik gut umgesetzt", "powervoll", "Spaß gehabt"];
 const CHIPS_NEBEN = ["wenig Schlaf", "Schule/Prüfung", "Ärger", "unglücklich", "kein Bock", "Alles supi!"];
+const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const isoDow = (iso) => ((new Date(iso + "T12:00:00").getDay() + 6) % 7) + 1;
+const seesDay = (person, iso) => !person?.training_days?.length || person.training_days.includes(isoDow(iso));
+const daysText = (d) => (d?.length ? d.slice().sort().map((x) => WD[x - 1]).join(", ") : "alle Tage");
 const STATUS = ["fit", "müde", "gestresst", "Muskelkater", "krank", "verletzt"];
 const SET_RATED = new Set(["Spezielle Würfe"]); // zusätzlich zu allen Blöcken mit Doku „Set“
 
@@ -261,17 +265,18 @@ async function feedbackPane(me) {
   const $p = document.getElementById("pane");
   const since = isoDay(new Date(Date.now() - 28 * 864e5)); const today = isoDay(new Date());
   const [{ data: people }, { data: units }, { data: entries }] = await Promise.all([
-    sb.from("people").select("id,name,role,active").eq("role", "athletin").eq("active", true).order("name"),
+    sb.from("people").select("id,name,role,active,training_days").eq("role", "athletin").eq("active", true).order("name"),
     sb.from("units").select("id,date,slot,released").gte("date", since).lte("date", today).eq("released", true).order("date"),
     sb.from("diary_entries").select("*, units(date,slot)").gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }),
   ]);
   const { data: openTests } = await sb.from("tests").select("*").eq("confirmed", false).order("date", { ascending: false });
   // Hinweis Wiedereinstieg: die letzten 3 freigegebenen Einheiten krank/verletzt oder nicht dokumentiert
-  const last3 = (units || []).slice(-3);
   const hints = (people || []).map((p) => {
+    const last3 = (units || []).filter((u) => seesDay(p, u.date)).slice(-3);
+    if (last3.length < 3) return { p, miss: 0 };
     const miss = last3.filter((u) => { const e = (entries || []).find((x) => x.athlete_id === p.id && x.unit_id === u.id); return !e || ["krank", "verletzt"].includes(e.status); });
     return { p, miss: miss.length };
-  }).filter((h) => last3.length >= 3 && h.miss >= 3);
+  }).filter((h) => h.miss >= 3);
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
   $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten krank, verletzt oder nicht dokumentiert.</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
     ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
@@ -359,12 +364,12 @@ async function peoplePane() {
   const $p = document.getElementById("pane");
   const { data: people } = await sb.from("people").select("*").order("role").order("name");
   $p.innerHTML = `<div class="card"><h3>Personen</h3>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Profil</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Trainingstage</th><th>Profil</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${x.role === "athletin" ? `<div class="chips daysel" data-pid="${esc(x.id)}">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${!!x.training_days?.includes(i + 1)}">${w}</button>`).join("")}</div><span class="small muted">${daysText(x.training_days)}</span>` : ""}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
     <form id="rf" class="row" hidden><span id="rname"></span><input id="rpw" minlength="8" required placeholder="Vorläufiges Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Setzen</button></form></div>
     <div class="card"><h3>Person freischalten</h3><p class="muted small">Die Athletin meldet sich einmal mit ihrer E-Mail an und schickt dir den angezeigten Code.</p>
     <form id="pf" class="row"><input id="pid" required placeholder="Code (ID)" style="flex:2 1 240px"><input id="pname" required placeholder="Name wie im Plan" style="flex:1 1 120px">
     <select id="prole"><option value="athletin">Athletin</option><option value="cotrainer">Co-Trainer</option></select>
-    <input id="pprof" placeholder="Profil (U18)" style="width:110px"><label class="small">Einwilligung <input type="date" id="pcons"></label><button class="btn">Freischalten</button></form></div>`;
+    <span class="small">Tage</span><div class="chips" id="pdays">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="false">${w}</button>`).join("")}</div><input id="pprof" placeholder="Profil (U18)" style="width:110px"><label class="small">Einwilligung <input type="date" id="pcons"></label><button class="btn">Freischalten</button></form></div>`;
   let resetId = null;
   $p.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => {
     resetId = b.dataset.reset; const f = document.getElementById("rf"); f.hidden = false;
@@ -377,10 +382,20 @@ async function peoplePane() {
     toast("Passwort gesetzt. Gib es der Athletin weiter; sie kann es danach unter „Passwort“ ändern.");
     document.getElementById("rf").hidden = true; document.getElementById("rpw").value = "";
   };
+  document.querySelectorAll("#pdays button").forEach((b) => (b.onclick = () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"))));
+  $p.querySelectorAll(".daysel").forEach((g) => g.querySelectorAll("button").forEach((b) => (b.onclick = async () => {
+    b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+    const days = [...g.querySelectorAll('[aria-pressed="true"]')].map((x) => +x.dataset.d);
+    const { error } = await sb.from("people").update({ training_days: days.length ? days : null }).eq("id", g.dataset.pid);
+    if (error) return toast("Nicht gespeichert: " + error.message);
+    g.nextElementSibling.textContent = daysText(days); toast("Trainingstage gespeichert");
+  })));
   document.getElementById("pf").onsubmit = async (e) => {
     e.preventDefault();
     const row = { id: document.getElementById("pid").value.trim(), name: document.getElementById("pname").value.trim(), role: document.getElementById("prole").value,
-      profile_code: document.getElementById("pprof").value.trim() || null, consent_on: document.getElementById("pcons").value || null };
+      profile_code: document.getElementById("pprof").value.trim() || null, consent_on: document.getElementById("pcons").value || null,
+      training_days: [...document.querySelectorAll('#pdays [aria-pressed="true"]')].map((b) => +b.dataset.d) };
+    if (!row.training_days.length) row.training_days = null;
     const { error } = await sb.from("people").insert(row);
     if (error) return toast("Nicht gespeichert: " + error.message);
     toast(`${row.name} freigeschaltet`); peoplePane();
@@ -468,7 +483,7 @@ async function deviationForm(box, me, people, athleteId = null, reason = "Wieder
 // ───────────── Tagebuch je Athletin (Trainer) ─────────────
 async function diaryPane(me) {
   const $p = document.getElementById("pane");
-  const { data: people } = await sb.from("people").select("id,name").eq("role", "athletin").eq("active", true).order("name");
+  const { data: people } = await sb.from("people").select("id,name,training_days").eq("role", "athletin").eq("active", true).order("name");
   if (!(people || []).length) return ($p.innerHTML = `<div class="card"><p class="muted">Noch keine Athletinnen freigeschaltet.</p></div>`);
   let sel = diaryPane.sel && people.find((p) => p.id === diaryPane.sel) ? diaryPane.sel : people[0].id;
   $p.innerHTML = `<div class="row"><div class="chips" id="dpa">${people.map((p) => `<button type="button" data-id="${esc(p.id)}" aria-pressed="${p.id === sel}">${esc(p.name)}</button>`).join("")}</div>
@@ -477,8 +492,9 @@ async function diaryPane(me) {
   document.getElementById("dpdev").onclick = () => deviationForm(document.getElementById("dpform"), me, people, sel, "Sonstiges");
   const ath = people.find((p) => p.id === sel);
   const since = isoDay(new Date(Date.now() - 21 * 864e5)), today = isoDay(new Date());
-  const { data: units } = await sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date", { ascending: false }).order("slot");
-  const ids = (units || []).map((u) => u.id);
+  const { data: allUnits } = await sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date", { ascending: false }).order("slot");
+  const units = (allUnits || []).filter((u) => seesDay(ath, u.date));
+  const ids = units.map((u) => u.id);
   if (!ids.length) return (document.getElementById("dplist").innerHTML = `<p class="muted">In den letzten drei Wochen wurde nichts freigegeben.</p>`);
   const [{ data: lines }, { data: entries }, { data: tests }, { data: devs }] = await Promise.all([
     sb.from("plan_lines").select("*").in("unit_id", ids),
