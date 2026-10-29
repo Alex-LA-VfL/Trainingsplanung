@@ -1,0 +1,1477 @@
+[
+ {
+  "name": "Einlaufen / Warmlaufen",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Einlaufen",
+   "Warmlaufen",
+   "laufen"
+  ]
+ },
+ {
+  "name": "Warmlaufen mit Seil(koordination)",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Seil",
+   "Seilkoordination",
+   "Warmlaufen mit Seil",
+   "Wl. mit Seil",
+   "mit Seil",
+   "mit Seilen",
+   "wl. Mit Seilkoordi",
+   "wl. mit Seilkoordi"
+  ]
+ },
+ {
+  "name": "Warmlaufen an Hürden",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "an Hürden",
+   "mit Hürden",
+   "warmlaufen an Hürden",
+   "wl. an Hürden"
+  ]
+ },
+ {
+  "name": "American Warm Up",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Fahrrad",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Warmlaufen mit Koordination",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "warmlaufen mit Koordination",
+   "wl. mit Koordi an Reifen"
+  ]
+ },
+ {
+  "name": "Sidesteps mit Loopband",
+  "block": "Kräftigung",
+  "count": "Meter",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Sidesteps mit Loopband um Knie Sprunggelek",
+   "Sidesteps mit Loopband um Knie Sprunggelenk"
+  ]
+ },
+ {
+  "name": "Warmlaufen mit Stabi",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "wl. mit Stabi Laufen im Wechsel"
+  ]
+ },
+ {
+  "name": "Barfuß auf Rasen",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Restl. Zeit al. auf Rasen",
+   "al. barfuß auf Rasen"
+  ]
+ },
+ {
+  "name": "Seitgalopp",
+  "block": "Aufwärmen",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Läufe/Tempoläufe",
+  "block": "Tempoläufe",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Koordiläufe",
+   "Koordination",
+   "Koordinationslauf",
+   "Koordinationsläufe"
+  ]
+ },
+ {
+  "name": "Skippings im Sitzen",
+  "block": "Zirkel",
+  "count": "Sekunden",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Sprint-ABC",
+  "block": "Sprint-/Lauf-ABC",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Sprint ABC"
+  ]
+ },
+ {
+  "name": "Ablöseläufe",
+  "block": "Sprint-/Lauf-ABC",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "AGS Ablöselauf",
+   "ASG Ablöselauf"
+  ]
+ },
+ {
+  "name": "Hürden-ABC",
+  "block": "Hürden-ABC",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hürden ABC"
+  ]
+ },
+ {
+  "name": "Kniebeuge hinten (KB hinten)",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "KB hinten"
+  ]
+ },
+ {
+  "name": "Reißen",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Gew. Reißen"
+  ]
+ },
+ {
+  "name": "Kniebeuge vorne (KB vorne)",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "KB vorne",
+   "vorne"
+  ]
+ },
+ {
+  "name": "Umsetzen",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Umsetzten"
+  ]
+ },
+ {
+  "name": "Bankziehen",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Bankzug",
+   "zug"
+  ]
+ },
+ {
+  "name": "Bankdrücken",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Bankdruck",
+   "Bankdrücken /"
+  ]
+ },
+ {
+  "name": "Kreuzheben einbeinig",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "KH eb",
+   "KH einbeinig",
+   "KH einbeining",
+   "Kreuzheben eb"
+  ]
+ },
+ {
+  "name": "Reiß-Kniebeuge (Reiß-KB)",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Reiß KB"
+  ]
+ },
+ {
+  "name": "Anreißen",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Hip Thrust",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "HipThrust"
+  ]
+ },
+ {
+  "name": "Ausstoßen",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Bankdrücken/-ziehen (Wechsel)",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "archiviert",
+  "aliases": [
+   "Bankdruck/ zug"
+  ]
+ },
+ {
+  "name": "Frontdrücken",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Umsetzen + KB vorne (Komplex)",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": [
+   "Umsetzen u. KB vorne in einem",
+   "Umsetzen und KB vorne",
+   "Umsetzten KB vorne"
+  ]
+ },
+ {
+  "name": "Reißen Technik",
+  "block": "Kraft Langhantel",
+  "count": "Minuten / Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Kniebeuge Technik",
+  "block": "Kraft Langhantel",
+  "count": "Minuten / Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "KB Technik",
+   "KB ohne Gewicht"
+  ]
+ },
+ {
+  "name": "Rudern mit Langhantel",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Umsetzen Technik",
+  "block": "Kraft Langhantel",
+  "count": "Minuten / Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Umsetzten Technik"
+  ]
+ },
+ {
+  "name": "Nackendrücken",
+  "block": "Kraft Langhantel",
+  "count": "Sätze×Wdh×kg",
+  "rm": true,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Kreuzheben einbeinig Technik",
+  "block": "Kraft Langhantel",
+  "count": "Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Kreuzheben eb Technik"
+  ]
+ },
+ {
+  "name": "Bauchroller",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Oberkörper aufrichten",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "OK Aufrichten",
+   "OK Aufrichten eb",
+   "OK aufrichten",
+   "OK aufrichten eb",
+   "OK aufrichten einbeinig",
+   "OK aufrichten mit Butterfly langsam"
+  ]
+ },
+ {
+  "name": "Hanteldrehen",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Flößen",
+  "block": "Spezielle Kraft",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Überzieher",
+  "block": "Spezielle Kraft",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Oberkörper aufrichten seitlich",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "OK Aufrichten seitl",
+   "OK aufrichten seitl"
+  ]
+ },
+ {
+  "name": "Pistol Squat (gerollt)",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Gerollte Pistol Squats",
+   "Pistol Squat",
+   "gerollte Pistol Squats",
+   "gerollte PistolSquats"
+  ]
+ },
+ {
+  "name": "Züge eng",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Split Squat",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "SplitSquat am Kasten mit Wade"
+  ]
+ },
+ {
+  "name": "Unterarmkraft",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Übung Unterarmkraft"
+  ]
+ },
+ {
+  "name": "Kastenheber",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Kastenheber mit Gewicht"
+  ]
+ },
+ {
+  "name": "Aufsteiger",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Step Uos unilateral",
+   "Step Ups unilateral"
+  ]
+ },
+ {
+  "name": "Leg Curl",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "10x Leg Curl",
+   "12x Leg Curl",
+   "8x Leg Curl"
+  ]
+ },
+ {
+  "name": "Butterfly rückwärts",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Butterfly rw",
+   "Fliegende rw"
+  ]
+ },
+ {
+  "name": "Abduktor/Adduktor",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Abd/Add",
+   "Abd/Add UAS",
+   "Abduktor/Adduktor AUS",
+   "Adduktion mit Scheibe ziehen"
+  ]
+ },
+ {
+  "name": "Butterfly vorwärts (Petziball)",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Butterfly vw",
+   "Butterfly vw Petziball /",
+   "Butterly vw Petziball"
+  ]
+ },
+ {
+  "name": "Ischio Petziball",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "OS Rückseite auf Petziball eb"
+  ]
+ },
+ {
+  "name": "Schienbeinzug",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Turnen: Hockwende",
+  "block": "Zirkel",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hockwende",
+   "Hockwende am Kasten"
+  ]
+ },
+ {
+  "name": "Ischio liegend",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Split Squat + Sprung",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Split Squat Sprung"
+  ]
+ },
+ {
+  "name": "Seitheben",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Aufroller",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Aufroller seitl"
+  ]
+ },
+ {
+  "name": "Kabelzug mit Ball",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Ischio Kabelzug stehend",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Burpees",
+  "block": "Zirkel",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Burpee"
+  ]
+ },
+ {
+  "name": "Seitbeuge",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Turnen: Stützeln am Barren",
+  "block": "Zirkel",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Stützeln am Barren"
+  ]
+ },
+ {
+  "name": "Pike Push-Ups",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Pike PushUps"
+  ]
+ },
+ {
+  "name": "Scheibenwischer",
+  "block": "Zirkel",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Unterarmstütz",
+  "block": "Zirkel",
+  "count": "Sätze×Sekunden",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "UAS / seitl Knie/Ellenbogen zus",
+   "UAS seitl. Knie und Ellenbogen zusammen",
+   "Unterarmstütz rw",
+   "Wechsel Liege /Unterarmstütz"
+  ]
+ },
+ {
+  "name": "Klimmzüge mit Band",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Ischio einbeinig am Gerät",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Ischio eb am Gerät"
+  ]
+ },
+ {
+  "name": "Situp an Schrägbank",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Russian Situp",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Russian SitUp"
+  ]
+ },
+ {
+  "name": "Turnen: Handstand Walks",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "Handstand Walks",
+   "Handstandwalk"
+  ]
+ },
+ {
+  "name": "Turnen: Unterhocken",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "Unterhocken"
+  ]
+ },
+ {
+  "name": "Latzug",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Lat.zug"
+  ]
+ },
+ {
+  "name": "Copenhagen Hold",
+  "block": "Kräftigung",
+  "count": "Sätze×Sekunden",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Copenhagen hold",
+   "Kopenhagenhol"
+  ]
+ },
+ {
+  "name": "Busemann",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Busemann /"
+  ]
+ },
+ {
+  "name": "Hamstrings unilateral mit Band",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Schubkarre",
+  "block": "Kräftigung",
+  "count": "Meter",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Kettlebell-Kniebeuge",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Kettlebell KB"
+  ]
+ },
+ {
+  "name": "Beinpresse exzentrisch",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Klappmesser",
+  "block": "Zirkel",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Klappmesser /"
+  ]
+ },
+ {
+  "name": "Liegestütz (+ Springen)",
+  "block": "Kräftigung",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "Liegestütz springen",
+   "Liegestütz und springen",
+   "Liegestütze"
+  ]
+ },
+ {
+  "name": "Ausfallschritt-Kniebeuge",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh×kg",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Ausfallschritt KB"
+  ]
+ },
+ {
+  "name": "Tau",
+  "block": "Zirkel",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Animal Walk",
+  "block": "Kräftigung",
+  "count": "Meter",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Unilateral Squat an hoher Stufe",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Schwebesitz Medizinball",
+  "block": "Kräftigung",
+  "count": "Sätze×Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Schwebesitz Med.Ball hin und her bewegen"
+  ]
+ },
+ {
+  "name": "Raketen",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Schlittschuh",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Frösche",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Frosch"
+  ]
+ },
+ {
+  "name": "Kleine Sprünge (Seil/Treppe/Rasen)",
+  "block": "Sprünge",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Bahnen kl. Reakt. Sprünge",
+   "Bahnen kl. Reaktive Sprünge",
+   "kl. Sprünge",
+   "kl. Sprünge an Treppe",
+   "kl. Sprünge auf Rasen",
+   "kl. Sprünge mit Seil",
+   "kl.Sprünge",
+   "kleine Sprünge",
+   "mit kl.Sprünge",
+   "viele kl. Sprünge",
+   "viele kleine Sprünge"
+  ]
+ },
+ {
+  "name": "Prellsprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Prell",
+   "Prellhopser"
+  ]
+ },
+ {
+  "name": "Hops",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hops /",
+   "Hops auf Höhe"
+  ]
+ },
+ {
+  "name": "Kastenaufsprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Kasten auf",
+   "Kastenauf",
+   "Kasutenaufsprünge",
+   "seitl. Aufspringen"
+  ]
+ },
+ {
+  "name": "Sprunglauf",
+  "block": "Sprünge",
+  "count": "Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Sprungläufe"
+  ]
+ },
+ {
+  "name": "Ausfallschrittsprünge (ASG)",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "ASG",
+   "ASG mit Hüpfer",
+   "Ausfallschrittsprünge"
+  ]
+ },
+ {
+  "name": "AFS (Absprung-Fuß-Sprünge)",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "AFS",
+   "AFS seitl"
+  ]
+ },
+ {
+  "name": "Startwechsel",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Halbtiefe Frösche",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "halbtiefe Freosch",
+   "halbtiefe Frösche"
+  ]
+ },
+ {
+  "name": "Hops im Rhythmus (2er/3er/5er)",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "2er Rhythmus Hops /",
+   "2er Rhythnus Hops",
+   "3er Hops wechselseitig",
+   "5er Rhythmus"
+  ]
+ },
+ {
+  "name": "Penetrationssprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Penetration"
+  ]
+ },
+ {
+  "name": "Anhock-/Streck-Sprünge (Hock-Streck)",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hock Streck"
+  ]
+ },
+ {
+  "name": "Tappings",
+  "block": "Zirkel",
+  "count": "Zeit",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Wechselsprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Wechselsprünge an Treppe",
+   "seitl. Wechselsprünge"
+  ]
+ },
+ {
+  "name": "Tiefsprünge (Dropjump)",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "DJ seitlich",
+   "DJ vw aufspringen",
+   "Dropjump rw",
+   "Dropjump seitlich",
+   "Dropjump vw"
+  ]
+ },
+ {
+  "name": "Grätschsprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Gegrätschte",
+   "gegrätscht"
+  ]
+ },
+ {
+  "name": "AFS mit Zwischenhüpfer",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Plyo-Kombination",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Plyokombi"
+  ]
+ },
+ {
+  "name": "Prellsprünge einbeinig",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Prell eb"
+  ]
+ },
+ {
+  "name": "Frosch Treppe hoch",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Hopserlauf betont",
+  "block": "Sprünge",
+  "count": "Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hopserlauf betont hoch",
+   "Hopserlauf betont und"
+  ]
+ },
+ {
+  "name": "Hampelmann (mit Gewicht)",
+  "block": "Zirkel",
+  "count": "Wdh",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Hampelmann",
+   "Hampelmann mit Gewicht"
+  ]
+ },
+ {
+  "name": "Hasensprünge",
+  "block": "Sprünge",
+  "count": "Kontakte",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Sprint",
+  "block": "Sprint",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "aus Kniehebern",
+   "fliegend"
+  ]
+ },
+ {
+  "name": "Zugschlitten",
+  "block": "Sprint",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Sprint an Hürden",
+  "block": "Sprint",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Anlauf an .Hürde",
+   "Sprint an ./ . Hürde",
+   "an Hürden kurz",
+   "über Hürden"
+  ]
+ },
+ {
+  "name": "Berganläufe",
+  "block": "Sprint",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Berganläufe voll"
+  ]
+ },
+ {
+  "name": "Steigerungen",
+  "block": "Sprint",
+  "count": "Läufe×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Stabi + 50 m Laufen (bis 1 km)",
+  "block": "Aufwärmen",
+  "count": "Meter",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "> in Summe 1km",
+   "Stabi laufen bis 1km gelaufen"
+  ]
+ },
+ {
+  "name": "Schwimmen",
+  "block": "Ausdauer",
+  "count": "Bahnen×m",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "ruhig Schwimmen"
+  ]
+ },
+ {
+  "name": "Dauerlauf",
+  "block": "Ausdauer",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "DL",
+   "Dl."
+  ]
+ },
+ {
+  "name": "Rasendiagonalen",
+  "block": "Ausdauer",
+  "count": "Anzahl",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Rasendiagonale",
+   "Rasendiagonalen Koord.Lauf"
+  ]
+ },
+ {
+  "name": "ULI/LILI-Läufe",
+  "block": "Ausdauer",
+  "count": "Anzahl",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "LILI Läufe",
+   "ULI",
+   "ULI Läufe",
+   "ULLI Läufe",
+   "ULLII"
+  ]
+ },
+ {
+  "name": "Russian Drill",
+  "block": "Ausdauer",
+  "count": "Runden",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Raupe",
+  "block": "Zirkel",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Minutenläufe",
+  "block": "Ausdauer",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Zirkel",
+  "block": "Zirkel",
+  "count": "Runden×(Belastung/Pause)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Hürden",
+  "block": "Technik",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "400mHü"
+  ]
+ },
+ {
+  "name": "Kugel",
+  "block": "Technik",
+  "count": "Würfe (+Gerät)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Hammer",
+  "block": "Technik",
+  "count": "Würfe (+Gerät)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Speer",
+  "block": "Technik",
+  "count": "Würfe (+Gerät)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": []
+ },
+ {
+  "name": "Hochsprung",
+  "block": "Technik",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Flugrolle",
+   "Hoch"
+  ]
+ },
+ {
+  "name": "Medizinball groß",
+  "block": "MedBälle groß",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "MedBall groß",
+   "gr. Med.Bälle",
+   "gr. MedBall"
+  ]
+ },
+ {
+  "name": "Medizinball schocken rw",
+  "block": "MedBälle groß",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "MeBall schocken rw weit",
+   "MedBall schocken",
+   "MedBall schocken rw hoch",
+   "Schocken rw",
+   "schocken rw"
+  ]
+ },
+ {
+  "name": "Medizinball schocken vw",
+  "block": "MedBälle groß",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "MedBall vw schocken",
+   "schocken vw"
+  ]
+ },
+ {
+  "name": "Medizinball aus Nacken",
+  "block": "MedBälle groß",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "Med.Ball aus Nacken",
+   "MedBall aus Nacken"
+  ]
+ },
+ {
+  "name": "Medizinball aus Bauchlage über Kopf",
+  "block": "MedBälle groß",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "archiviert",
+  "aliases": [
+   "Med.Ball aus Bauchlage über Kopf",
+   "MedBall aus Bauchlage über Kopf",
+   "MedBall über Kopf auf Boden"
+  ]
+ },
+ {
+  "name": "Medizinball klein",
+  "block": "MedBälle klein",
+  "count": "Würfe (+kg)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "kl. Med.Bälle",
+   "kl. MedBall"
+  ]
+ },
+ {
+  "name": "Dehnen",
+  "block": "Aufwärmen",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Restl. Zeit Dehnen"
+  ]
+ },
+ {
+  "name": "Spiel",
+  "block": "Spiel",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Sprintspiel",
+   "Streetball/Basketball/",
+   "spielen & dehnen"
+  ]
+ },
+ {
+  "name": "Mobilisation",
+  "block": "Stabi/Mobi",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Blackroll",
+   "Mobi",
+   "Restl. Zeit Mobi",
+   "Rückenmobi"
+  ]
+ },
+ {
+  "name": "Stabi (allgemein)",
+  "block": "Stabi/Mobi",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Stabi",
+   "mit Stabi"
+  ]
+ },
+ {
+  "name": "Fußstabi",
+  "block": "Stabi/Mobi",
+  "count": "Minuten",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Fussstabi etc. am Strand",
+   "Fußstabi im Sand",
+   "Restl. Zeit Fußstabi im Sand"
+  ]
+ },
+ {
+  "name": "Kugelschocken vw/rw",
+  "block": "Spezielle Würfe",
+  "count": "Würfe (+Gerät)",
+  "rm": false,
+  "status": "aktiv",
+  "aliases": [
+   "Kugelschocken rw",
+   "Kugelschocken vw",
+   "Kugelschocken vw, Kugelschocken rw"
+  ]
+ },
+ {
+  "name": "Fersen nach oben seitlich",
+  "block": "Zirkel",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "neu – prüfen",
+  "aliases": [
+   "Fersen nach oben seitl."
+  ]
+ },
+ {
+  "name": "C- mit Bewegen",
+  "block": "Zirkel",
+  "count": "Wdh, Zeit",
+  "rm": false,
+  "status": "neu – prüfen",
+  "aliases": [
+   "C- mit bewegen"
+  ]
+ }
+]

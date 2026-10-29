@@ -1,0 +1,195 @@
+<title>Planprüfung Wurf</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: Kopf mit Datei-Upload · Kennzahlen · zwei Spalten: Prüfliste | Handy-Vorschau */
+:root{
+  --bg:#f4f5f2; --surface:#fff; --ink:#1d2320; --muted:#5d665f; --line:#d9ddd6;
+  --accent:#1f6b4f; --accent-soft:#e1efe8; --mark:#b45309; --mark-soft:#fdf0e1; --bad:#b42318; --bad-soft:#fdecea;
+  --code:#eef1ec; --hol:#fff2c2; --feast:#f8d7d4;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#131715;--surface:#1b201d;--ink:#e7ebe6;--muted:#a2aba4;--line:#2e3631;--accent:#6cc39b;--accent-soft:#1d3229;--mark:#f0a95b;--mark-soft:#33261a;--bad:#f28b82;--bad-soft:#3a1f1d;--code:#202622;--hol:#3a3420;--feast:#3d2423;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#131715;--surface:#1b201d;--ink:#e7ebe6;--muted:#a2aba4;--line:#2e3631;--accent:#6cc39b;--accent-soft:#1d3229;--mark:#f0a95b;--mark-soft:#33261a;--bad:#f28b82;--bad-soft:#3a1f1d;--code:#202622;--hol:#3a3420;--feast:#3d2423;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:24px}
+h1,h2,h3{font-family:var(--f-display);margin:0;letter-spacing:.01em}
+h1{font-size:clamp(28px,4.5vw,40px)} h2{font-size:22px} h3{font-size:18px}
+header{display:grid;gap:12px;border-bottom:3px solid var(--ink);padding-bottom:16px}
+.lead{color:var(--muted);max-width:70ch;margin:0}
+.drop{display:flex;flex-wrap:wrap;gap:12px;align-items:center;border:2px dashed var(--line);border-radius:10px;padding:14px;background:var(--surface)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.btn{font:600 14px var(--f-body);background:var(--accent);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:focus-visible,.chip:focus-visible,select:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.src{font-size:13px;color:var(--muted)}
+.kpis{display:flex;flex-wrap:wrap;gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 14px;display:grid}
+.kpi b{font:700 24px var(--f-display);font-variant-numeric:tabular-nums} .kpi span{font-size:12px;color:var(--muted)}
+.kpi.bad b{color:var(--bad)} .kpi.ok b{color:var(--accent)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:24px;align-items:start}
+.problems{display:grid;gap:8px}
+.pgroup{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.pgroup h3{padding:8px 12px;background:var(--code);font-size:16px}
+.prob{display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:7px 12px;border-top:1px solid var(--line);align-items:baseline}
+.lvl{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.lvl.Fehler{background:var(--bad-soft);color:var(--bad)} .lvl.Hinweis{background:var(--mark-soft);color:var(--mark)}
+.cellref{font:12px var(--f-mono);color:var(--muted)}
+.empty{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;color:var(--muted)}
+.controls{display:grid;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 14px var(--f-body);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:5px 12px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+select{font:14px var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:4px}
+.tab{font:600 13px var(--f-body);border:0;background:transparent;color:var(--muted);padding:6px 9px;border-radius:6px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.tab.free{text-decoration:line-through;opacity:.6}
+.phone{border:1px solid var(--line);border-radius:22px;background:var(--surface);padding:14px;display:grid;gap:10px}
+.dayinfo{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--code)}
+.pill.hol{background:var(--hol)} .pill.feast{background:var(--feast)} .pill.term{background:var(--accent-soft);color:var(--accent)}
+.blk{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.blk h4{margin:0;padding:7px 12px;background:var(--code);font:600 16px var(--f-display);display:flex;justify-content:space-between;gap:8px}
+.blk h4 small{font:600 11px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.blk ul{list-style:none;margin:0;padding:0}
+.blk li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:7px 12px;border-top:1px solid var(--line)}
+.blk li:first-child{border-top:0}
+.nm{font-weight:600} .ds{font:12.5px var(--f-mono);text-align:right;white-space:nowrap}
+.dt{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--mark-soft);color:var(--mark);margin-right:4px}
+.note{font-size:13px;color:var(--muted)}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Planprüfung</h1>
+  <p class="lead">Lade deine Planungsdatei hoch. Jede Zeile wird nach der Planungssprache geprüft; Fehler stehen mit Zellangabe links, rechts siehst du, was jede Athletin am Handy bekäme. Die Datei bleibt auf deinem Gerät, es wird nichts hochgeladen oder gespeichert.</p>
+  <div class="drop" id="drop">
+    <button class="btn" id="pick" type="button">Excel-Datei wählen</button>
+    <input type="file" id="file" accept=".xlsx,.xlsm" hidden>
+    <span class="src" id="src">Beispiel geladen: Vorlage 2026/27, KW 44–53. Datei hierher ziehen oder wählen.</span>
+  </div>
+</header>
+<div class="kpis" id="kpis"></div>
+<div class="grid">
+  <section class="problems" id="problems" aria-label="Prüfergebnis"></section>
+  <section class="controls">
+    <div class="chips" id="chips" role="group" aria-label="Athletin"></div>
+    <label class="note">Woche <select id="week"></select></label>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Tag"></div>
+    <div class="phone" id="phone"></div>
+    <p class="note">kg erscheinen, sobald Maximalkrafttests in der App hinterlegt sind; bis dahin stehen hier die Prozentwerte.</p>
+  </section>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+/*__INLINE_PARSER__*/
+import { makeCatalog, parseDay, planFor, HAUPTBLOECKE, DOKU } from "../src/planungssprache.js";
+/*__END_INLINE_PARSER__*/
+/*__INLINE_DATA__*/
+const CATALOG = await (await fetch("../data/uebungskatalog.json")).json();
+const SAMPLE = await (await fetch("../data/beispiel_kw44-53.json")).json();
+/*__END_INLINE_DATA__*/
+
+const cat = makeCatalog(CATALOG);
+const DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const colL = (i) => { let s = ""; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+const fmtDate = (d) => d ? `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.` : "";
+
+/** Arbeitsmappe → { athletes, weeks:[{kw, phase, hint, days:[{date, kalender, termine, cells:[{block,lines,cell}]}]}] } */
+function readWorkbook(wb) {
+  const sheetName = wb.SheetNames.find((n) => /saisonplanung/i.test(n)) || wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: null });
+  const hi = rows.findIndex((r) => r && r.includes("Hauptblock"));
+  if (hi < 0) throw new Error(`Im Blatt „${sheetName}“ fehlt die Kopfzeile mit „Hauptblock“.`);
+  const H = rows[hi]; const ci = (n) => H.indexOf(n);
+  const cKW = ci("KW"), cMon = ci("Montag"), cPh = ci("Phase"), cHi = ci("Hinweis"), cBl = ci("Hauptblock"), cD = DAYS.map(ci);
+  const toDate = (v) => v instanceof Date ? v : typeof v === "number" ? new Date(Math.round((v - 25569) * 864e5)) : null;
+  const weeks = []; let w = null;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || []; const lab = r[cBl];
+    if (lab === "Datum") {
+      const mon = toDate(r[cMon]);
+      w = { kw: r[cKW], phase: r[cPh], hint: r[cHi], days: DAYS.map((_, d) => ({ date: mon ? new Date(mon.getTime() + d * 864e5) : toDate(r[cD[d]]), kalender: "", termine: "", cells: [] })) };
+      weeks.push(w); continue;
+    }
+    if (!w) continue;
+    if (lab === "Kalender" || lab === "Termine") { DAYS.forEach((_, d) => { w.days[d][lab.toLowerCase()] = r[cD[d]] ? String(r[cD[d]]) : ""; }); continue; }
+    if (typeof lab === "string" && lab.trim()) {
+      DAYS.forEach((_, d) => {
+        const v = r[cD[d]]; if (v == null || v === "") return;
+        w.days[d].cells.push({ block: lab.trim(), lines: String(v).split(/\r?\n/), cell: `${colL(cD[d])}${i + 1}` });
+      });
+    }
+  }
+  let athletes = [];
+  const as = wb.Sheets["Athletinnen"];
+  if (as) athletes = XLSX.utils.sheet_to_json(as, { header: 1 }).slice(1).map((r) => r && r[0]).filter(Boolean).map(String);
+  return { athletes, weeks, sheetName };
+}
+
+let DATA = null, ath = null, wk = 0, day = 0;
+function analyse(data) {
+  for (const w of data.weeks) for (const d of w.days) {
+    const unknownBlocks = d.cells.filter((c) => !HAUPTBLOECKE.includes(c.block));
+    const r = parseDay(d.cells, cat, data.athletes);
+    unknownBlocks.forEach((c) => r.problems.push({ level: "Fehler", text: `Unbekannter Hauptblock „${c.block}“`, cell: c.cell }));
+    d.items = r.items; d.problems = r.problems;
+  }
+  DATA = data; ath = data.athletes[0] || null;
+  const today = new Date(); const idx = data.weeks.findIndex((w) => w.days[6].date && w.days[6].date >= today);
+  wk = idx >= 0 ? idx : 0; day = 0; render();
+}
+function render() {
+  const all = DATA.weeks.flatMap((w) => w.days.flatMap((d) => d.problems.map((p) => ({ ...p, w, d }))));
+  const errs = all.filter((p) => p.level === "Fehler").length, hints = all.length - errs;
+  const tdays = DATA.weeks.reduce((a, w) => a + w.days.filter((d) => d.items.length).length, 0);
+  const lines = DATA.weeks.reduce((a, w) => a + w.days.reduce((b, d) => b + d.items.length, 0), 0);
+  document.getElementById("kpis").innerHTML = [["Wochen", DATA.weeks.length], ["Trainingstage", tdays], ["Planzeilen", lines], ["Fehler", errs, errs ? "bad" : "ok"], ["Hinweise", hints]]
+    .map(([l, v, c]) => `<div class="kpi ${c || ""}"><b>${v}</b><span>${l}</span></div>`).join("");
+  const pe = document.getElementById("problems");
+  if (!all.length) pe.innerHTML = `<h2>Prüfergebnis</h2><div class="empty">Alle ${lines} Zeilen sind eindeutig. Der Plan kann so hochgeladen werden.</div>`;
+  else {
+    const groups = new Map();
+    for (const p of all) { const k = `KW ${p.w.kw} · ${DAYS[p.w.days.indexOf(p.d)]} ${fmtDate(p.d.date)}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+    pe.innerHTML = `<h2>Prüfergebnis</h2>` + [...groups].map(([k, ps]) => `<div class="pgroup"><h3>${esc(k)}</h3>${ps.map((p) => `<div class="prob"><span class="lvl ${p.level}">${p.level}</span><span>${esc(p.text)}</span><span class="cellref">${esc(p.cell || "")}</span></div>`).join("")}</div>`).join("");
+  }
+  document.getElementById("chips").innerHTML = DATA.athletes.map((a) => `<button class="chip" data-a="${esc(a)}" aria-pressed="${a === ath}">${esc(a)}</button>`).join("") || `<span class="note">Keine Athletinnen im Blatt „Athletinnen“.</span>`;
+  document.querySelectorAll(".chip").forEach((b) => b.onclick = () => { ath = b.dataset.a; render(); });
+  const sel = document.getElementById("week");
+  sel.innerHTML = DATA.weeks.map((w, i) => `<option value="${i}" ${i === wk ? "selected" : ""}>KW ${w.kw} · ${fmtDate(w.days[0].date)}–${fmtDate(w.days[6].date)}${w.phase ? " · " + esc(w.phase) : ""}</option>`).join("");
+  sel.onchange = () => { wk = +sel.value; day = 0; render(); };
+  const W = DATA.weeks[wk];
+  document.getElementById("tabs").innerHTML = W.days.map((d, i) => `<button class="tab ${d.items.length ? "" : "free"}" role="tab" aria-selected="${i === day}" data-i="${i}">${DAYS[i]} ${fmtDate(d.date)}</button>`).join("");
+  document.querySelectorAll(".tab").forEach((b) => b.onclick = () => { day = +b.dataset.i; render(); });
+  const D = W.days[day];
+  const info = [D.kalender && `<span class="pill ${/ferien/i.test(D.kalender) ? "hol" : "feast"}">${esc(D.kalender)}</span>`, D.termine && `<span class="pill term">${esc(D.termine)}</span>`, W.hint && `<span class="pill">${esc(W.hint)}</span>`].filter(Boolean).join("");
+  const plan = ath ? planFor(ath, D.items, {}, { markMissing: false }) : [];
+  const blocks = []; for (const e of plan) { const last = blocks[blocks.length - 1]; if (last && last.block === e.block && last.slot === e.slot) last.items.push(e); else blocks.push({ block: e.block, slot: e.slot, items: [e] }); }
+  document.getElementById("phone").innerHTML = `<h3>${DAYS[day]}, ${fmtDate(D.date)} · ${esc(ath || "")}</h3>${info ? `<div class="dayinfo">${info}</div>` : ""}` +
+    (blocks.length ? blocks.map((b) => `<div class="blk"><h4>${b.slot ? "E" + b.slot + " · " : ""}${esc(b.block)}<small>${esc(DOKU[b.block] || "abhaken")}</small></h4><ul>${b.items.map((e) => `<li><span class="nm">${e.replaced ? `<span class="tag">statt ${esc(e.replaced)}</span>` : ""}${esc(e.name)}</span><span class="ds">${esc(e.dose)}</span>${e.detail || e.note || e.missing ? `<span class="dt">${e.missing ? '<span class="tag">keine Disziplin zugeteilt</span>' : ""}${esc([e.detail, e.note].filter(Boolean).join(" · "))}</span>` : ""}</li>`).join("")}</ul></div>`).join("")
+      : `<p class="note">Kein Training geplant.</p>`);
+}
+function load(file) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    try { const wb = XLSX.read(new Uint8Array(fr.result), { type: "array", cellDates: true }); const d = readWorkbook(wb);
+      document.getElementById("src").textContent = `${file.name} · Blatt „${d.sheetName}“ · ${d.weeks.length} Wochen`; analyse(d); }
+    catch (e) { document.getElementById("src").textContent = `Datei konnte nicht gelesen werden: ${e.message}`; }
+  };
+  fr.readAsArrayBuffer(file);
+}
+const dz = document.getElementById("drop"), fi = document.getElementById("file");
+document.getElementById("pick").onclick = () => fi.click();
+fi.onchange = () => fi.files[0] && load(fi.files[0]);
+dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("over"); };
+dz.ondragleave = () => dz.classList.remove("over");
+dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("over"); e.dataTransfer.files[0] && load(e.dataTransfer.files[0]); };
+SAMPLE.weeks.forEach((w) => w.days.forEach((d) => d.date = new Date(d.date)));
+analyse(SAMPLE);
+</script>
