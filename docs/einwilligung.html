@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Einwilligung Trainings-App</title>
+<style>
+  :root{--ink:#1d2320;--muted:#5d665f;--line:#c9cec6}
+  body{font:16px/1.55 "Source Sans 3","Segoe UI",Arial,sans-serif;color:var(--ink);background:#fff;max-width:760px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:26px;margin:0 0 4px} h2{font-size:18px;margin:22px 0 6px}
+  p,li{max-width:70ch} ul{padding-left:20px}
+  .muted{color:var(--muted);font-size:14px}
+  table{border-collapse:collapse;width:100%;font-size:14px} th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+  .sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:36px}
+  .sign div{border-top:1px solid var(--ink);padding-top:4px;font-size:13px;color:var(--muted)}
+  .fill{display:inline-block;min-width:240px;border-bottom:1px solid var(--ink)}
+  .box{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:14px 0}
+  @media print{.noprint{display:none} body{padding:0}}
+</style>
+</head>
+<body>
+<p class="noprint muted">Zum Ausdrucken: im Browser „Drucken“ wählen. Für Athletinnen unter 18 Jahren unterschreiben zusätzlich die Erziehungsberechtigten.</p>
+<h1>Einwilligung zur Nutzung der Trainings-App</h1>
+<p class="muted">Trainingsgruppe Wurf · [Vereinsname] · Stand Oktober 2026</p>
+
+<h2>Worum es geht</h2>
+<p>Die Trainingsgruppe nutzt eine Web-App für Trainingsplan und Trainingstagebuch. Du siehst dort deinen Plan für den jeweiligen Tag und hältst fest, wie das Training lief und wie es dir geht. Dein Trainer nutzt diese Rückmeldungen, um das Training an dich anzupassen, zum Beispiel nach einer Krankheit.</p>
+
+<h2>Welche Daten gespeichert werden</h2>
+<table>
+  <tr><th>Daten</th><th>Wer sie sieht</th></tr>
+  <tr><td>Name, E-Mail-Adresse, Geburtsjahr, Disziplinen</td><td>Du und die Trainer; die anderen Athletinnen sehen nur deinen Namen</td></tr>
+  <tr><td>Trainingstagebuch: Bewertungen, Gewichte, Würfe, Kommentare</td><td>Nur du und die Trainer</td></tr>
+  <tr><td>Befinden: fit, müde, gestresst, Muskelkater, <b>krank, verletzt</b></td><td>Nur du und die Trainer</td></tr>
+  <tr><td>Testwerte (z. B. Maximalkraft) und Wettkampfergebnisse</td><td>Die ganze Trainingsgruppe</td></tr>
+</table>
+<p>Angaben wie „krank“ oder „verletzt“ sind Gesundheitsdaten. Es werden keine Diagnosen abgefragt; freiwillige Kommentare solltest du entsprechend knapp halten.</p>
+
+<h2>Wo die Daten liegen</h2>
+<ul>
+  <li>Datenbank: Supabase, Rechenzentrum in Frankfurt am Main (EU).</li>
+  <li>Die App-Seite wird über GitHub Pages ausgeliefert. Dort liegen nur der Programmcode, keine Trainingsdaten; beim Aufruf verarbeitet GitHub technisch die IP-Adresse.</li>
+  <li>Eine Sicherungskopie legt der Trainer im Konto des Vereins ab.</li>
+</ul>
+
+<h2>Wie lange</h2>
+<p>Solange du in der Trainingsgruppe bist. Danach werden deine Daten innerhalb von drei Monaten gelöscht, sofern du nichts anderes möchtest.</p>
+
+<h2>Deine Rechte</h2>
+<p>Die Einwilligung ist freiwillig. Ohne sie kannst du ganz normal mittrainieren und dein Tagebuch weiter auf Papier führen. Du kannst sie jederzeit beim Trainer widerrufen; bis dahin gespeicherte Daten werden dann gelöscht. Du kannst jederzeit Auskunft über deine gespeicherten Daten verlangen und sie berichtigen oder löschen lassen.</p>
+
+<h2>Verantwortlich</h2>
+<p>[Vereinsname], vertreten durch den Vorstand. Ansprechpartner: Alexander Ott (Trainer und Vorstand).</p>
+
+<div class="box">
+  <p><b>Ich willige ein</b>, dass meine oben genannten Daten, einschließlich der Angaben zu Krankheit und Verletzung, für die Trainingsplanung in der Trainings-App gespeichert und verarbeitet werden.</p>
+</div>
+<p>Name der Athletin / des Athleten: <span class="fill">&nbsp;</span></p>
+<div class="sign">
+  <div>Ort, Datum, Unterschrift Athletin / Athlet</div>
+  <div>Ort, Datum, Unterschrift Erziehungsberechtigte (bei unter 18 Jahren)</div>
+</div>
+<p class="muted" style="margin-top:28px">Hinweis: Dieser Text ist eine Vorlage und keine Rechtsberatung. Vereinsname und Ansprechpartner bitte vor der Verwendung ergänzen und durch den Vorstand freigeben.</p>
+</body>
+</html>

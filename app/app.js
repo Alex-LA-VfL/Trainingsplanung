@@ -105,6 +105,7 @@ function showPending(user) {
 
 // ───────────── Athletin ─────────────
 async function athleteView(me) {
+  if (!me.consent_app_at) return consentScreen(me);
   const today = isoDay(new Date());
   const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint,changed_at,released_at").order("date", { ascending: false }).order("slot").limit(60);
   if (error) return ($app.innerHTML = `<div class="card">${esc(error.message)}</div>`);
@@ -129,10 +130,12 @@ async function dayForm(me, unit, onSaved) {
     sb.from("calendar_entries").select("*").lte("date_from", unit.date).gte("date_to", unit.date),
     sb.from("tests").select("exercise_name,value,date").eq("athlete_id", me.id).eq("test_type", "1RM").order("date", { ascending: false }),
   ]);
-  const rm = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm)) rm[t.exercise_name] = Number(t.value);
-  const items = (lines || []).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block }))
+  const { data: devs } = await sb.from("deviations").select("*").eq("athlete_id", me.id).eq("unit_id", unit.id);
+  const rm0 = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm0)) rm0[t.exercise_name] = Number(t.value);
+  const items0 = (lines || []).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block }))
     .sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
-  const plan = planFor(me.name, items, rm);
+  const adj = applyDeviations(items0, rm0, devs || []);
+  const plan = planFor(me.name, adj.items, adj.rm);
   const prev = new Map((entry?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}|${i.actual?.set || ""}`, i]));
   const st = { befinden: new Set(entry?.befinden?.length ? entry.befinden : [entry?.status && entry.status !== "eingeschränkt" ? entry.status : "fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
 
@@ -147,6 +150,7 @@ async function dayForm(me, unit, onSaved) {
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
 
   let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${pills}</div>`;
+  if (adj.notes.length) html += `<div class="card adj"><h3>Für dich angepasst</h3>${adj.notes.map((n) => `<p>${esc(n)}</p>`).join("")}</div>`;
   html += `<div class="card"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
   blocks.forEach((b, bi) => {
     html += `<section class="blk"><h3>${esc(b.block)}<small>${b.doku === "Set" ? "als Block bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></h3>`;
@@ -243,17 +247,17 @@ async function dayForm(me, unit, onSaved) {
 
 // ───────────── Trainer ─────────────
 async function trainerView(me) {
-  const tabs = me.role === "planer" ? ["Rückmeldungen", "Plan hochladen", "Freigabe", "Personen"] : ["Rückmeldungen"];
+  const tabs = me.role === "planer" ? ["Rückmeldungen", "Tagebuch", "Plan hochladen", "Freigabe", "Personen", "Sicherung"] : ["Rückmeldungen", "Tagebuch"];
   let cur = tabs[0];
   const draw = () => {
     $app.innerHTML = `<div class="tabs" role="tablist">${tabs.map((t) => `<button role="tab" aria-selected="${t === cur}">${t}</button>`).join("")}</div><div id="pane"></div>`;
     $app.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => { cur = b.textContent; draw(); }));
-    ({ "Rückmeldungen": feedbackPane, "Plan hochladen": uploadPane, "Freigabe": releasePane, "Personen": peoplePane })[cur](me);
+    ({ "Rückmeldungen": feedbackPane, "Tagebuch": diaryPane, "Plan hochladen": uploadPane, "Freigabe": releasePane, "Personen": peoplePane, "Sicherung": backupPane })[cur](me);
   };
   draw();
 }
 
-async function feedbackPane() {
+async function feedbackPane(me) {
   const $p = document.getElementById("pane");
   const since = isoDay(new Date(Date.now() - 28 * 864e5)); const today = isoDay(new Date());
   const [{ data: people }, { data: units }, { data: entries }] = await Promise.all([
@@ -269,9 +273,10 @@ async function feedbackPane() {
     return { p, miss: miss.length };
   }).filter((h) => last3.length >= 3 && h.miss >= 3);
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
-  $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten krank, verletzt oder nicht dokumentiert. Plan vor der nächsten Freigabe anpassen.</p>`).join("")}</div>` : ""}
+  $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten krank, verletzt oder nicht dokumentiert.</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
     ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
     <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${(e.befinden?.length ? e.befinden : [e.status]).map((v) => v === "fit" ? "fit" : `<span class="pill ${["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join(" ")}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+  $p.querySelectorAll("[data-adjust]").forEach((b) => (b.onclick = () => deviationForm(document.getElementById("devform"), me, people, b.dataset.adjust, "Wiedereinstieg")));
   $p.querySelectorAll("[data-confirm]").forEach((b) => (b.onclick = async () => {
     const { error } = await sb.from("tests").update({ confirmed: true }).eq("id", +b.dataset.confirm);
     if (error) return toast(error.message); toast("Bestätigt"); feedbackPane();
@@ -354,7 +359,7 @@ async function peoplePane() {
   const $p = document.getElementById("pane");
   const { data: people } = await sb.from("people").select("*").order("role").order("name");
   $p.innerHTML = `<div class="card"><h3>Personen</h3>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Profil</th><th>Einwilligung</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Profil</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${esc(x.profile_code || "")}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
     <form id="rf" class="row" hidden><span id="rname"></span><input id="rpw" minlength="8" required placeholder="Vorläufiges Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Setzen</button></form></div>
     <div class="card"><h3>Person freischalten</h3><p class="muted small">Die Athletin meldet sich einmal mit ihrer E-Mail an und schickt dir den angezeigten Code.</p>
     <form id="pf" class="row"><input id="pid" required placeholder="Code (ID)" style="flex:2 1 240px"><input id="pname" required placeholder="Name wie im Plan" style="flex:1 1 120px">
@@ -379,6 +384,153 @@ async function peoplePane() {
     const { error } = await sb.from("people").insert(row);
     if (error) return toast("Nicht gespeichert: " + error.message);
     toast(`${row.name} freigeschaltet`); peoplePane();
+  };
+}
+
+// ───────────── Einwilligung ─────────────
+function consentScreen(me) {
+  $app.innerHTML = `<div class="card" style="max-width:620px">
+    <h1>Bevor es losgeht</h1>
+    <p>In dieser App führst du dein Trainingstagebuch. Dafür werden gespeichert:</p>
+    <ul><li>dein Name, deine E-Mail und dein Geburtsjahr,</li><li>deine Trainingsdoku: Bewertungen, Gewichte, Würfe, Kommentare,</li><li>dein Befinden, auch <b>krank oder verletzt</b>,</li><li>Testwerte und Wettkampfergebnisse (die sieht die ganze Gruppe).</li></ul>
+    <p>Tagebuch und Befinden sehen nur du und deine Trainer. Die Daten liegen auf einem Server in Frankfurt. Du kannst die Einwilligung jederzeit beim Trainer widerrufen.</p>
+    <p><a href="../docs/einwilligung.html" target="_blank" rel="noopener">Vollständigen Text lesen</a></p>
+    <label class="check" style="color:var(--ink)"><input type="checkbox" id="ok"> Ich habe den Text gelesen und willige ein.</label>
+    <p class="small muted">Unter 18? Dann brauchst du zusätzlich die unterschriebene Einwilligung deiner Eltern auf Papier.</p>
+    <button class="btn" id="go" disabled>Einwilligen und weiter</button></div>`;
+  const ok = document.getElementById("ok"), go = document.getElementById("go");
+  ok.onchange = () => (go.disabled = !ok.checked);
+  go.onclick = async () => {
+    const { error } = await sb.rpc("accept_consent");
+    if (error) return toast("Nicht gespeichert: " + error.message);
+    me.consent_app_at = new Date().toISOString(); athleteView(me);
+  };
+}
+
+// ───────────── Abweichungen ─────────────
+const DEV_KINDS = { last_prozent: "Last ändern (%)", umfang_prozent: "Umfang ändern (%)", block_weglassen: "Hauptblock weglassen", hinweis: "Nur Hinweis an die Athletin" };
+const REASONS = ["Wiedereinstieg", "krank", "verletzt", "Wettkampf", "Schule", "Test", "Sonstiges"];
+const devText = (d) => d.kind === "last_prozent" ? `Last ${d.value?.v > 0 ? "+" : ""}${d.value?.v} %` : d.kind === "umfang_prozent" ? `Umfang ${d.value?.v > 0 ? "+" : ""}${d.value?.v} %` : d.kind === "block_weglassen" ? `ohne ${d.value?.block}` : "Hinweis";
+
+/** Abweichungen auf die geparsten Planzeilen anwenden (vor planFor) */
+function applyDeviations(items, rm, devs) {
+  let out = items.map((i) => JSON.parse(JSON.stringify(i)));
+  const rmAdj = { ...rm }; const notes = [];
+  for (const d of devs) {
+    const v = Number(d.value?.v) || 0;
+    if (d.kind === "last_prozent") {
+      for (const k in rmAdj) rmAdj[k] = rmAdj[k] * (1 + v / 100);
+      out.forEach((i) => { if (i.type === "strength") i.note = [i.note, `Last ${v > 0 ? "+" : ""}${v} %`].filter(Boolean).join(" · "); });
+    } else if (d.kind === "umfang_prozent") {
+      const f = 1 + v / 100, r = (x) => Math.max(1, Math.round(x * f));
+      out.forEach((i) => {
+        if (i.setGroups) i.setGroups = i.setGroups.map((g) => ({ ...g, sets: r(g.sets) }));
+        if (i.type === "series" || i.type === "circuit" || i.type === "sequence") i.rounds = r(i.rounds);
+        if (i.type === "runs") i.runs = r(i.runs);
+        if (i.type === "count") i.count = Math.round(i.count * f);
+      });
+    } else if (d.kind === "block_weglassen") out = out.filter((i) => i.block !== d.value?.block);
+    notes.push(`${devText(d)} · ${d.reason}${d.note ? " · " + d.note : ""}`);
+  }
+  return { items: out, rm: rmAdj, notes };
+}
+
+async function deviationForm(box, me, people, athleteId = null, reason = "Wiedereinstieg") {
+  const today = isoDay(new Date());
+  const { data: units } = await sb.from("units").select("id,date,slot").gte("date", today).order("date").order("slot").limit(30);
+  if (!(units || []).length) return (box.innerHTML = `<p class="muted">Es sind noch keine kommenden Einheiten hochgeladen.</p>`);
+  box.innerHTML = `<form class="card" id="dvf" style="margin-top:8px">
+    <h3>Abweichung festlegen</h3>
+    <div class="row"><label>Athletin <select id="dva">${(people || []).map((p) => `<option value="${esc(p.id)}" ${p.id === athleteId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
+      <label>ab <select id="dvu">${units.map((u) => `<option value="${u.id}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</option>`).join("")}</select></label>
+      <label>für <select id="dvn">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}">${n} Einheit${n > 1 ? "en" : ""}</option>`).join("")}</select></label></div>
+    <div class="row"><label>Art <select id="dvk">${Object.entries(DEV_KINDS).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+      <label id="dvvl">Wert <input id="dvv" type="number" step="5" value="-10" style="width:80px"> %</label>
+      <label id="dvbl" hidden>Block <select id="dvb">${HAUPTBLOECKE.map((b) => `<option>${esc(b)}</option>`).join("")}</select></label>
+      <label>Anlass <select id="dvr">${REASONS.map((r) => `<option ${r === reason ? "selected" : ""}>${r}</option>`).join("")}</select></label></div>
+    <input id="dvt" placeholder="Notiz an die Athletin (freiwillig)">
+    <div class="row"><button class="btn">Speichern</button><span class="small muted">Die Athletin sieht die Anpassung oben in ihrem Tag; gesammelt werden daraus später deine Faustregeln.</span></div></form>`;
+  const kind = document.getElementById("dvk");
+  kind.onchange = () => { document.getElementById("dvvl").hidden = !kind.value.endsWith("prozent"); document.getElementById("dvbl").hidden = kind.value !== "block_weglassen"; };
+  document.getElementById("dvf").onsubmit = async (e) => {
+    e.preventDefault();
+    const start = units.findIndex((u) => u.id === +document.getElementById("dvu").value);
+    const sel = units.slice(start, start + +document.getElementById("dvn").value);
+    const k = kind.value;
+    const value = k.endsWith("prozent") ? { v: Number(document.getElementById("dvv").value) } : k === "block_weglassen" ? { block: document.getElementById("dvb").value } : null;
+    const rows = sel.map((u) => ({ athlete_id: document.getElementById("dva").value, unit_id: u.id, kind: k, value, reason: document.getElementById("dvr").value, note: document.getElementById("dvt").value.trim() || null, author_id: me.id }));
+    const { error } = await sb.from("deviations").insert(rows);
+    if (error) return toast("Nicht gespeichert: " + error.message);
+    toast(`Gespeichert für ${rows.length} Einheit${rows.length > 1 ? "en" : ""}`); box.innerHTML = "";
+  };
+}
+
+// ───────────── Tagebuch je Athletin (Trainer) ─────────────
+async function diaryPane(me) {
+  const $p = document.getElementById("pane");
+  const { data: people } = await sb.from("people").select("id,name").eq("role", "athletin").eq("active", true).order("name");
+  if (!(people || []).length) return ($p.innerHTML = `<div class="card"><p class="muted">Noch keine Athletinnen freigeschaltet.</p></div>`);
+  let sel = diaryPane.sel && people.find((p) => p.id === diaryPane.sel) ? diaryPane.sel : people[0].id;
+  $p.innerHTML = `<div class="row"><div class="chips" id="dpa">${people.map((p) => `<button type="button" data-id="${esc(p.id)}" aria-pressed="${p.id === sel}">${esc(p.name)}</button>`).join("")}</div>
+    <button class="btn ghost" id="dpdev">Abweichung festlegen</button></div><div id="dpform"></div><div id="dplist" style="display:grid;gap:12px"><p class="muted">Lädt …</p></div>`;
+  $p.querySelectorAll("#dpa button").forEach((b) => (b.onclick = () => { diaryPane.sel = b.dataset.id; diaryPane(me); }));
+  document.getElementById("dpdev").onclick = () => deviationForm(document.getElementById("dpform"), me, people, sel, "Sonstiges");
+  const ath = people.find((p) => p.id === sel);
+  const since = isoDay(new Date(Date.now() - 21 * 864e5)), today = isoDay(new Date());
+  const { data: units } = await sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date", { ascending: false }).order("slot");
+  const ids = (units || []).map((u) => u.id);
+  if (!ids.length) return (document.getElementById("dplist").innerHTML = `<p class="muted">In den letzten drei Wochen wurde nichts freigegeben.</p>`);
+  const [{ data: lines }, { data: entries }, { data: tests }, { data: devs }] = await Promise.all([
+    sb.from("plan_lines").select("*").in("unit_id", ids),
+    sb.from("diary_entries").select("*, diary_items(*)").eq("athlete_id", sel).in("unit_id", ids),
+    sb.from("tests").select("exercise_name,value,date").eq("athlete_id", sel).eq("test_type", "1RM").order("date", { ascending: false }),
+    sb.from("deviations").select("*").eq("athlete_id", sel).in("unit_id", ids),
+  ]);
+  const rm0 = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm0)) rm0[t.exercise_name] = Number(t.value);
+  const dot = (v) => v ? `<span class="pill" style="background:var(--r${v});color:${v === 3 ? "#1d2320" : "#fff"}">${v} · ${RATE[v - 1]}</span>` : "";
+  document.getElementById("dplist").innerHTML = units.map((u) => {
+    const e = (entries || []).find((x) => x.unit_id === u.id);
+    const its = (lines || []).filter((l) => l.unit_id === u.id).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block })).sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
+    const adj = applyDeviations(its, rm0, (devs || []).filter((d) => d.unit_id === u.id));
+    const plan = planFor(ath.name, adj.items, adj.rm);
+    const di = new Map((e?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}`, i]));
+    const blocks = []; for (const x of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === x.block) l.items.push(x); else blocks.push({ block: x.block, items: [x] }); }
+    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${(e.befinden?.length ? e.befinden : [e.status]).map((v) => `<span class="pill ${v === "fit" ? "ok" : ["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join("")}${dot(e.day_rating)}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
+    const meta = e ? `${(e.chips || []).length ? `<p class="small">${esc(e.chips.join(" · "))}</p>` : ""}${e.note ? `<p class="small">„${esc(e.note)}“</p>` : ""}` : "";
+    const body = blocks.map((b) => {
+      const setI = di.get(`${b.items[0].lineId}|SET:${b.block}`);
+      return `<div class="blk"><h3>${esc(b.block)}${setI?.rating ? dot(setI.rating) : ""}</h3>${b.items.map((x) => {
+        const i = di.get(`${x.lineId}|${x.name}`); const a = i?.actual || {};
+        const ist = [a.ist && a.ist !== x.dose.split(" · ")[0] ? `Ist ${a.ist}` : "", a.kg != null ? `${String(a.kg).replace(".", ",")} kg` : "", a.done === true ? "✓" : a.done === false ? "nicht erledigt" : "",
+          (a.wuerfe || []).map((w) => `${w.form || "Würfe"}${w.geraet ? " (" + w.geraet + ")" : ""}: ${w.n}`).join(" · "), (i?.chips || []).join(", ")].filter(Boolean).join(" · ");
+        return `<div class="item"><div class="ihead"><span class="iname">${x.replaced ? `<span class="tag">statt ${esc(x.replaced)}</span>` : ""}${esc(x.name)}</span><span class="idose">${esc(x.dose)}</span></div>${ist || i?.rating ? `<div class="idetail">${i?.rating ? dot(i.rating) + " " : ""}${esc(ist)}</div>` : ""}</div>`;
+      }).join("")}</div>`;
+    }).join("");
+    return `<div class="card">${head}${adj.notes.length ? `<p class="small"><span class="pill warn">angepasst</span> ${esc(adj.notes.join(" · "))}</p>` : ""}${meta}${body}</div>`;
+  }).join("");
+}
+
+// ───────────── Sicherung ─────────────
+async function backupPane() {
+  const $p = document.getElementById("pane");
+  $p.innerHTML = `<div class="card"><h3>Sicherung</h3><p class="muted">Lädt alle Daten als Excel-Datei herunter: Personen, Pläne, Tagebuch, Tests, Ergebnisse, Abweichungen und Kalender. Am besten wöchentlich im Vereinskonto ablegen.</p>
+    <div class="row"><button class="btn" id="bk">Sicherung herunterladen</button><span class="small muted" id="bkm"></span></div></div>`;
+  document.getElementById("bk").onclick = async () => {
+    const $m = document.getElementById("bkm"); const wb = XLSX.utils.book_new();
+    const tables = ["people", "units", "plan_lines", "diary_entries", "diary_items", "tests", "results", "deviations", "calendar_entries", "rules", "comments"];
+    for (const t of tables) {
+      $m.textContent = `Lese ${t} …`;
+      let rows = [], from = 0;
+      for (;;) {
+        const { data, error } = await sb.from(t).select("*").range(from, from + 999);
+        if (error) return ($m.textContent = `${t}: ${error.message}`);
+        rows = rows.concat(data); if (data.length < 1000) break; from += 1000;
+      }
+      const flat = rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v !== null && typeof v === "object" ? JSON.stringify(v) : v])));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flat.length ? flat : [{ leer: "" }]), t.slice(0, 31));
+    }
+    XLSX.writeFile(wb, `Trainingsplanung_Sicherung_${isoDay(new Date())}.xlsx`);
+    $m.textContent = "Fertig.";
   };
 }
 
