@@ -18,5 +18,5 @@ Kern ist die **Planungssprache**: Der Trainer schreibt wie gewohnt, das System v
 Im Code stehen keine Daten und keine geheimen Schlüssel. Der öffentliche Supabase-Schlüssel ist für die App bestimmt; geschützt wird über die Zugriffsregeln in der Datenbank.
 
 ## App
-`app/index.html` – Anmeldung per E-Mail-Link. Planer: Plan hochladen, Freigabe, Personen, Rückmeldungen. Athletinnen: freigegebene Tage bis heute, Doku je Hauptblock.
+`app/index.html` – Anmeldung mit E-Mail und Passwort (ohne Mailversand). Planer: Plan hochladen, Freigabe, Personen, Rückmeldungen. Athletinnen: freigegebene Tage bis heute, Doku je Hauptblock.
 Adresse: https://alex-la-vfl.github.io/Trainingsplanung/app/

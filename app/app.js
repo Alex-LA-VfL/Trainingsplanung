@@ -41,15 +41,38 @@ async function start() {
 
 function showLogin() {
   $app.innerHTML = `<div class="card" style="max-width:460px">
-    <h1>Anmelden</h1>
-    <p class="muted">Gib deine E-Mail-Adresse ein. Du bekommst einen Link, mit dem du dich ohne Passwort anmeldest.</p>
-    <form id="lf" class="row"><input id="email" type="email" required autocomplete="email" placeholder="name@beispiel.de" style="flex:1"><button class="btn">Link senden</button></form>
-    <p class="small muted" id="lmsg"></p></div>`;
+    <h1 id="lt">Anmelden</h1>
+    <form id="lf" style="display:grid;gap:10px">
+      <input id="email" type="email" required autocomplete="email" placeholder="E-Mail">
+      <input id="pw" type="password" required minlength="8" autocomplete="current-password" placeholder="Passwort (mind. 8 Zeichen)">
+      <button class="btn" id="lb">Anmelden</button>
+    </form>
+    <p class="small"><a href="#" id="toggle">Neu hier? Konto anlegen</a></p>
+    <p class="small muted" id="lmsg"></p>
+    <p class="small muted">Passwort vergessen? Sag deinem Trainer Bescheid.</p></div>`;
+  let mode = "login";
+  const $msg = document.getElementById("lmsg");
+  document.getElementById("toggle").onclick = (e) => {
+    e.preventDefault(); mode = mode === "login" ? "signup" : "login";
+    document.getElementById("lt").textContent = mode === "login" ? "Anmelden" : "Konto anlegen";
+    document.getElementById("lb").textContent = mode === "login" ? "Anmelden" : "Konto anlegen";
+    document.getElementById("pw").autocomplete = mode === "login" ? "current-password" : "new-password";
+    e.target.textContent = mode === "login" ? "Neu hier? Konto anlegen" : "Schon ein Konto? Anmelden";
+    $msg.textContent = "";
+  };
   document.getElementById("lf").onsubmit = async (e) => {
     e.preventDefault();
-    const email = document.getElementById("email").value.trim();
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-    document.getElementById("lmsg").textContent = error ? `Das hat nicht geklappt: ${error.message}` : `Link an ${email} gesendet. Bitte E-Mail öffnen und auf den Link tippen (auch im Spam-Ordner schauen).`;
+    const email = document.getElementById("email").value.trim(), password = document.getElementById("pw").value;
+    $msg.textContent = "…";
+    const { data, error } = mode === "login"
+      ? await sb.auth.signInWithPassword({ email, password })
+      : await sb.auth.signUp({ email, password });
+    if (error) {
+      $msg.textContent = /invalid login/i.test(error.message) ? "E-Mail oder Passwort stimmt nicht." : /already registered/i.test(error.message) ? "Diese E-Mail hat schon ein Konto. Bitte anmelden." : `Das hat nicht geklappt: ${error.message}`;
+      return;
+    }
+    if (!data.session) { $msg.textContent = "Konto angelegt, aber noch nicht aktiv: In Supabase muss „Confirm email“ ausgeschaltet sein."; return; }
+    location.reload();
   };
 }
 
