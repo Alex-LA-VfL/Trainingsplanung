@@ -231,7 +231,7 @@ export function planFor(athlete, dayItems, rm = {}, { markMissing = true } = {})
   const out = [];
   for (const p of dayItems) {
     if (p.only && !p.only.includes(athlete)) continue;
-    const base = { block: p.block, pos: p.pos, slot: p.slot, note: p.note, doku: DOKU[p.block] || "abhaken", type: p.type };
+    const base = { block: p.block, pos: p.pos, slot: p.slot, note: p.note, doku: DOKU[p.block] || "abhaken", type: p.type, lineId: p.lineId ?? null };
     if (p.type === "strength" || p.type === "test") {
       for (const it of p.items) {
         let ex = it.exercise, name = ex ? ex.name : it.raw, replaced = null;
