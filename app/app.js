@@ -111,17 +111,21 @@ function showPending(user) {
 async function athleteView(me) {
   if (!me.consent_app_at) return consentScreen(me);
   const today = isoDay(new Date());
-  const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint,changed_at,released_at").order("date", { ascending: false }).order("slot").limit(60);
+  const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint").order("date", { ascending: false }).order("slot").limit(60);
   if (error) return ($app.innerHTML = `<div class="card">${esc(error.message)}</div>`);
-  const { data: diaries } = await sb.from("diary_entries").select("unit_id").eq("athlete_id", me.id);
-  const done = new Set((diaries || []).map((d) => d.unit_id));
+  const { data: diaries } = await sb.from("diary_entries").select("unit_id,day_rating").eq("athlete_id", me.id);
+  const done = new Map((diaries || []).map((d) => [d.unit_id, !!d.day_rating]));
+  const cls = (id) => (done.has(id) ? (done.get(id) ? "done" : "part") : "");
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
   let cur = units.find((u) => u.date === today) || units[0];
   const draw = async () => {
-    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${done.has(u.id) ? "done" : ""}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
+    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
     const bar = $app.querySelector(".days"); bar.scrollLeft = bar.scrollWidth;
     $app.querySelectorAll(".days button").forEach((b) => (b.onclick = () => { cur = units.find((u) => u.id === +b.dataset.id); draw(); }));
-    await dayForm(me, cur, () => { done.add(cur.id); draw(); });
+    await dayForm(me, cur, (rated) => {
+      done.set(cur.id, rated);
+      const b = $app.querySelector(`.days button[data-id="${cur.id}"]`); if (b) b.className = cls(cur.id);
+    });
   };
   draw();
 }
@@ -148,9 +152,8 @@ async function dayForm(me, unit, onSaved) {
   // Blöcke in Planreihenfolge bündeln
   const blocks = [];
   for (const e of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === e.block) l.items.push(e); else blocks.push({ block: e.block, doku: e.doku, items: [e] }); }
-  const changed = unit.changed_at && unit.released_at && new Date(unit.changed_at) > new Date(unit.released_at);
   const pills = [...(cal || []).map((c) => `<span class="pill ${c.kind === "Feiertag" ? "bad" : c.kind === "Schulferien" ? "warn" : "ok"}">${esc(c.title)}</span>`),
-    unit.week_hint ? `<span class="pill">${esc(unit.week_hint)}</span>` : "", changed ? `<span class="pill warn">nach Freigabe geändert</span>` : ""].join("");
+    unit.week_hint ? `<span class="pill">${esc(unit.week_hint)}</span>` : ""].join("");
 
   const rateHTML = (key, val) => `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}" title="${r}" aria-label="${i + 1} ${r}">${i + 1}</button>`).join("")}<span class="rlabel">${val ? RATE[val - 1] : ""}</span></div>`;
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
@@ -165,6 +168,7 @@ async function dayForm(me, unit, onSaved) {
       const old = prev.get(key);
       html += `<div class="item"><div class="ihead"><span class="iname">${e.replaced ? `<span class="tag">statt ${esc(e.replaced)}</span>` : ""}${esc(e.name)}</span><span class="idose">${esc(e.dose)}</span></div>`;
       if (e.detail || e.note) html += `<div class="idetail">${esc([e.detail, e.note].filter(Boolean).join(" · "))}</div>`;
+      if (e.pauses) html += `<div class="idetail pause">Pause: ${esc(e.pauses)}</div>`;
       if (b.doku === "je Übung" && !e.test) {
         const planKg = (e.dose.match(/([\d]+(?:,\d+)?) kg/) || [])[1] || "";
         html += `<div class="ist"><label>Ist <input data-ist="${esc(key)}" value="${esc(old?.actual?.ist ?? e.dose.split(" · ")[0])}"></label><label>kg <input data-kg="${esc(key)}" inputmode="decimal" style="width:76px" placeholder="kg" value="${esc(old?.actual?.kg ?? planKg)}"></label></div>${rateHTML("i:" + key, old?.rating || null)}`;
@@ -183,72 +187,124 @@ async function dayForm(me, unit, onSaved) {
     html += `</section>`;
   });
   html += `<div class="card"><h3>Trainingstag gesamt</h3>${rateHTML("day", st.day)}<h3>Was war los?</h3>${chipHTML("neben", CHIPS_NEBEN, st.chips)}<textarea id="note" placeholder="Kommentar (freiwillig)">${esc(st.note)}</textarea>
-    <button class="btn" id="save">${entry ? "Änderungen speichern" : "Training speichern"}</button></div>`;
+    <div class="row"><button class="btn" id="save">Speichern</button><span class="small muted" id="svst">${entry ? "gespeichert" : ""}</span></div>
+    <p class="small muted">Eingaben werden automatisch gespeichert, auch wenn das Handy zwischendurch in den Standby geht. „Tag gesamt“ kannst du am Ende ergänzen.</p></div>`;
   $d.innerHTML = html;
 
   // Interaktion
   const ratings = new Map(); const chipSel = new Map();
-  $d.querySelectorAll(".rate").forEach((g) => g.querySelectorAll("button").forEach((b) => (b.onclick = () => {
-    g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); ratings.set(g.dataset.key, +b.dataset.v);
-    g.querySelector(".rlabel").textContent = RATE[+b.dataset.v - 1];
-  })));
+  const dkey = `draft:${me.id}:${unit.id}`;
+  const $st = () => document.getElementById("svst");
+  const setRate = (g, v) => {
+    g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(+x.dataset.v === v)));
+    g.querySelector(".rlabel").textContent = v ? RATE[v - 1] : ""; ratings.set(g.dataset.key, v);
+  };
+  $d.querySelectorAll(".rate").forEach((g) => g.querySelectorAll("button").forEach((b) => (b.onclick = () => { setRate(g, +b.dataset.v); changed(); })));
   $d.querySelectorAll(".rate").forEach((g) => { const s = g.querySelector('[aria-pressed="true"]'); if (s) ratings.set(g.dataset.key, +s.dataset.v); });
+  const setChips = (g, vals) => { const s = new Set(vals); chipSel.set(g.dataset.key, s); g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(s.has(x.dataset.v)))); };
   $d.querySelectorAll(".chips").forEach((g) => {
     const isStatus = g.dataset.key === "status";
     chipSel.set(g.dataset.key, new Set([...g.querySelectorAll('[aria-pressed="true"]')].map((b) => b.dataset.v)));
     g.querySelectorAll("button").forEach((b) => (b.onclick = () => {
       const s = chipSel.get(g.dataset.key);
-      if (s.has(b.dataset.v)) { s.delete(b.dataset.v); b.setAttribute("aria-pressed", "false"); } else { s.add(b.dataset.v); b.setAttribute("aria-pressed", "true"); }
+      if (s.has(b.dataset.v)) s.delete(b.dataset.v); else s.add(b.dataset.v);
       if (isStatus) { // „fit“ schließt alles andere aus
         if (b.dataset.v === "fit" && s.has("fit")) [...s].forEach((v) => v !== "fit" && s.delete(v));
         if (b.dataset.v !== "fit") s.delete("fit");
-        g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(s.has(x.dataset.v))));
       }
+      setChips(g, [...s]); changed();
     }));
   });
-  $d.querySelectorAll("[data-addrow]").forEach((b) => (b.onclick = () => {
-    const r = document.createElement("div"); r.className = "tr";
-    r.innerHTML = `<input placeholder="Wurfform"><input placeholder="Gerät"><input placeholder="Würfe" inputmode="numeric">`;
-    b.before(r); r.querySelector("input").focus();
-  }));
-
-  document.getElementById("save").onclick = async () => {
-    const dayRating = ratings.get("day");
-    if (!dayRating) return toast("Bitte den Trainingstag gesamt bewerten");
-    const btn = document.getElementById("save"); btn.disabled = true;
-    const bef = [...chipSel.get("status")];
-    const status = bef.includes("verletzt") ? "verletzt" : bef.includes("krank") ? "krank" : bef.find((v) => v !== "fit") || "fit";
-    const row = { athlete_id: me.id, unit_id: unit.id, status, befinden: bef.length ? bef : ["fit"], day_rating: dayRating,
-      chips: [...(chipSel.get("neben") || [])], note: document.getElementById("note").value.trim() || null, updated_at: new Date().toISOString() };
-    const { data: saved, error } = await sb.from("diary_entries").upsert(row, { onConflict: "athlete_id,unit_id" }).select("id").single();
-    if (error) { btn.disabled = false; return toast("Speichern fehlgeschlagen: " + error.message); }
-    const out = [];
-    const lineOf = (key) => +key.split("|")[0] || null;
-    for (const [k, v] of ratings) if (k.startsWith("i:")) { const key = k.slice(2); out.push({ diary_id: saved.id, plan_line_id: lineOf(key), rating: v, actual: { name: key.split("|")[1] } }); }
-    $d.querySelectorAll("[data-ist]").forEach((inp) => {
-      const key = inp.dataset.ist; const ex = out.find((o) => `${o.plan_line_id}|${o.actual.name}|` === key);
-      if (ex) ex.actual.ist = inp.value; else out.push({ diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: key.split("|")[1], ist: inp.value } });
-    });
-    $d.querySelectorAll("[data-kg]").forEach((inp) => {
-      const key = inp.dataset.kg; const ex = out.find((o) => `${o.plan_line_id}|${o.actual.name}|` === key);
-      const kg = inp.value.trim() ? Number(inp.value.replace(",", ".")) : null;
-      if (ex) ex.actual.kg = kg; else out.push({ diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: key.split("|")[1], kg } });
-    });
-    const testRows = [...$d.querySelectorAll("[data-test]")].filter((i) => i.value.trim()).map((i) => ({ athlete_id: me.id, date: unit.date, test_type: "1RM",
-      exercise_name: i.dataset.test, value: Number(i.value.replace(",", ".")), unit: "kg", context: "Test", created_by: me.id }));
-    if (testRows.length) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) toast("Testwerte nicht gespeichert: " + et.message); }
-    $d.querySelectorAll("[data-done]").forEach((cb) => out.push({ diary_id: saved.id, plan_line_id: lineOf(cb.dataset.done), actual: { name: cb.dataset.done.split("|")[1], done: cb.checked } }));
-    $d.querySelectorAll("[data-throws]").forEach((w) => {
-      const key = w.dataset.throws;
-      const wuerfe = [...w.querySelectorAll(".tr")].map((r) => { const [a, b, c] = r.querySelectorAll("input"); return { form: a.value.trim(), geraet: b.value.trim(), n: c.value.trim() }; }).filter((r) => r.form || r.n);
-      out.push({ diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: key.split("|")[1], wuerfe }, chips: [...(chipSel.get("t:" + key) || [])] });
-    });
-    await sb.from("diary_items").delete().eq("diary_id", saved.id);
-    const { error: e2 } = out.length ? await sb.from("diary_items").insert(out) : { error: null };
-    btn.disabled = false;
-    if (e2) return toast("Einzelwerte nicht gespeichert: " + e2.message);
-    toast("Gespeichert"); onSaved();
+  const addRow = (box, r = {}) => {
+    const row = document.createElement("div"); row.className = "tr";
+    row.innerHTML = `<input placeholder="Wurfform" value="${esc(r.form || "")}"><input placeholder="Gerät" value="${esc(r.geraet || "")}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n || "")}">`;
+    box.querySelector("[data-addrow]").before(row); return row;
   };
+  $d.querySelectorAll("[data-addrow]").forEach((b) => (b.onclick = () => { addRow(b.parentElement).querySelector("input").focus(); }));
+
+  // Zustand erfassen (für Entwurf und Speichern)
+  const snapshot = () => ({
+    ts: Date.now(),
+    ratings: Object.fromEntries(ratings),
+    chips: Object.fromEntries([...chipSel].map(([k, v]) => [k, [...v]])),
+    ist: Object.fromEntries([...$d.querySelectorAll("[data-ist]")].map((i) => [i.dataset.ist, i.value])),
+    kg: Object.fromEntries([...$d.querySelectorAll("[data-kg]")].map((i) => [i.dataset.kg, i.value])),
+    done: Object.fromEntries([...$d.querySelectorAll("[data-done]")].map((i) => [i.dataset.done, i.checked])),
+    throws: Object.fromEntries([...$d.querySelectorAll("[data-throws]")].map((w) => [w.dataset.throws,
+      [...w.querySelectorAll(".tr")].map((r) => { const [a, b, c] = r.querySelectorAll("input"); return { form: a.value.trim(), geraet: b.value.trim(), n: c.value.trim() }; })])),
+    note: document.getElementById("note").value,
+  });
+  const restore = (d) => {
+    for (const [k, v] of Object.entries(d.ratings || {})) { const g = [...$d.querySelectorAll(".rate")].find((x) => x.dataset.key === k); if (g && v) setRate(g, v); }
+    for (const [k, v] of Object.entries(d.chips || {})) { const g = [...$d.querySelectorAll(".chips")].find((x) => x.dataset.key === k); if (g) setChips(g, v); }
+    $d.querySelectorAll("[data-ist]").forEach((i) => { if (i.dataset.ist in (d.ist || {})) i.value = d.ist[i.dataset.ist]; });
+    $d.querySelectorAll("[data-kg]").forEach((i) => { if (i.dataset.kg in (d.kg || {})) i.value = d.kg[i.dataset.kg]; });
+    $d.querySelectorAll("[data-done]").forEach((i) => { if (i.dataset.done in (d.done || {})) i.checked = d.done[i.dataset.done]; });
+    $d.querySelectorAll("[data-throws]").forEach((w) => {
+      const rows = d.throws?.[w.dataset.throws]; if (!rows) return;
+      w.querySelectorAll(".tr").forEach((r) => r.remove()); (rows.length ? rows : [{}]).forEach((r) => addRow(w, r));
+    });
+    if (typeof d.note === "string") document.getElementById("note").value = d.note;
+  };
+  try {
+    const d = JSON.parse(localStorage.getItem(dkey) || "null");
+    if (d && (!entry || d.ts > new Date(entry.updated_at).getTime())) { restore(d); toast("Nicht gespeicherte Eingaben wiederhergestellt"); setTimeout(() => persist(), 500); }
+  } catch {}
+
+  // Automatisch speichern: sofort auf dem Handy, nach kurzer Pause in der Datenbank
+  let timer = null, busy = false, again = false;
+  function changed() {
+    try { localStorage.setItem(dkey, JSON.stringify(snapshot())); } catch {}
+    if ($st()) $st().textContent = "wird gespeichert …";
+    clearTimeout(timer); timer = setTimeout(() => persist(), 2500);
+  }
+  $d.addEventListener("input", changed);
+  $d.addEventListener("change", changed);
+  const flush = () => { if (timer) { clearTimeout(timer); timer = null; persist(); } };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
+  window.addEventListener?.("online", () => { try { if (localStorage.getItem(dkey)) persist(); } catch {} });
+
+  async function persist(manual = false) {
+    timer = null;
+    if (busy) { again = true; return; }
+    busy = true;
+    try {
+      const snap = snapshot();
+      const bef = snap.chips.status || [];
+      const status = bef.includes("verletzt") ? "verletzt" : bef.includes("krank") ? "krank" : bef.find((v) => v !== "fit") || "fit";
+      const row = { athlete_id: me.id, unit_id: unit.id, status, befinden: bef.length ? bef : ["fit"], day_rating: snap.ratings.day || null,
+        chips: snap.chips.neben || [], note: snap.note.trim() || null, updated_at: new Date().toISOString() };
+      const { data: saved, error } = await sb.from("diary_entries").upsert(row, { onConflict: "athlete_id,unit_id" }).select("id").single();
+      if (error) throw error;
+      const lineOf = (key) => +key.split("|")[0] || null;
+      const nameOf = (key) => key.split("|")[1];
+      const items = new Map();
+      const get = (key) => { if (!items.has(key)) items.set(key, { diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: nameOf(key) }, rating: null, chips: [] }); return items.get(key); };
+      for (const [k, v] of Object.entries(snap.ratings)) if (k.startsWith("i:") && v) get(k.slice(2)).rating = v;
+      for (const [k, v] of Object.entries(snap.ist)) get(k).actual.ist = v;
+      for (const [k, v] of Object.entries(snap.kg)) get(k).actual.kg = v.trim() ? Number(v.replace(",", ".")) : null;
+      for (const [k, v] of Object.entries(snap.done)) get(k).actual.done = v;
+      for (const [k, v] of Object.entries(snap.throws)) { const it = get(k); it.actual.wuerfe = v.filter((r) => r.form || r.n); it.chips = snap.chips["t:" + k] || []; }
+      await sb.from("diary_items").delete().eq("diary_id", saved.id);
+      if (items.size) { const { error: e2 } = await sb.from("diary_items").insert([...items.values()]); if (e2) throw e2; }
+      const testRows = [...$d.querySelectorAll("[data-test]")].filter((i) => i.value.trim()).map((i) => ({ athlete_id: me.id, date: unit.date, test_type: "1RM",
+        exercise_name: i.dataset.test, value: Number(i.value.replace(",", ".")), unit: "kg", context: "Test", created_by: me.id }));
+      if (testRows.length) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) throw et; }
+      try { const d = JSON.parse(localStorage.getItem(dkey) || "null"); if (d && d.ts <= snap.ts) localStorage.removeItem(dkey); } catch {}
+      const t = new Date();
+      if ($st()) $st().textContent = `gespeichert ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}${row.day_rating ? "" : " · Tag gesamt fehlt noch"}`;
+      if (manual) toast(row.day_rating ? "Gespeichert" : "Gespeichert – Tag gesamt fehlt noch");
+      onSaved(!!row.day_rating);
+    } catch (e) {
+      if ($st()) $st().textContent = navigator.onLine === false ? "offline – wird nachgeholt, deine Eingaben sind auf dem Handy gesichert" : "nicht gespeichert – erneuter Versuch …";
+      if (manual) toast("Speichern fehlgeschlagen: " + (e.message || e));
+      if (navigator.onLine !== false) timer = setTimeout(() => persist(), 15000);
+    } finally {
+      busy = false;
+      if (again) { again = false; persist(); }
+    }
+  }
+  document.getElementById("save").onclick = () => { clearTimeout(timer); persist(true); };
 }
 
 // ───────────── Trainer ─────────────
@@ -301,7 +357,7 @@ async function feedbackPane(me) {
 
 async function uploadPane(me) {
   const $p = document.getElementById("pane");
-  $p.innerHTML = `<div class="card"><h3>Plan hochladen</h3><p class="muted">Excel-Datei wählen. Sie wird geprüft; erst wenn sie fehlerfrei ist, kannst du sie übernehmen. Bereits vorhandene Tage werden ersetzt, Tagebucheinträge bleiben erhalten.</p>
+  $p.innerHTML = `<div class="card"><h3>Plan hochladen</h3><p class="muted">Excel-Datei wählen. Sie wird geprüft; erst wenn sie fehlerfrei ist, kannst du sie übernehmen. Kommende Tage werden durch den neuen Plan ersetzt. Vergangene und bereits dokumentierte Tage bleiben unverändert.</p>
     <input type="file" id="f" accept=".xlsx,.xlsm"><div id="res"></div></div>`;
   document.getElementById("f").onchange = async (ev) => {
     const file = ev.target.files[0]; if (!file) return;
@@ -328,22 +384,30 @@ async function uploadPane(me) {
     if (errs.length) return;
     document.getElementById("go").onclick = async () => {
       const btn = document.getElementById("go"); btn.disabled = true; const $g = document.getElementById("prog");
-      const from = isoDay(days[0].d.date), to = isoDay(days[days.length - 1].d.date);
-      // Kalender (Ferien, Feiertage, Termine) im Zeitraum ersetzen
-      await sb.from("calendar_entries").delete().gte("date_from", from).lte("date_from", to);
+      const from = isoDay(days[0].d.date), to = isoDay(days[days.length - 1].d.date), today = isoDay(new Date());
+      // Kalender (Ferien, Feiertage, Termine) ab heute ersetzen, Vergangenes bleibt
+      const calFrom = from > today ? from : today;
+      await sb.from("calendar_entries").delete().gte("date_from", calFrom).lte("date_from", to);
       const calRows = [];
       for (const { d } of days) {
         const day = isoDay(d.date);
+        if (day < calFrom) continue;
         if (d.kalender) calRows.push({ date_from: day, date_to: day, kind: /ferien/i.test(d.kalender) ? "Schulferien" : "Feiertag", title: d.kalender });
         if (d.termine) calRows.push({ date_from: day, date_to: day, kind: /^frei$/i.test(d.termine.trim()) ? "frei" : /wettkampf|meisterschaft|sportfest|werfertag/i.test(d.termine) ? "Wettkampf" : /trainingslager|\bTL\b/i.test(d.termine) ? "Trainingslager" : "Termin", title: d.termine });
       }
       if (calRows.length) { const { error } = await sb.from("calendar_entries").insert(calRows); if (error) return ($g.textContent = "Kalender: " + error.message); }
-      let n = 0;
+      const { data: exist } = await sb.from("units").select("id,date,slot").gte("date", from).lte("date", to);
+      const ids = (exist || []).map((u) => u.id);
+      const { data: docd } = ids.length ? await sb.from("diary_entries").select("unit_id").in("unit_id", ids) : { data: [] };
+      const prot = new Set((docd || []).map((x) => x.unit_id));
+      let n = 0, skipped = 0;
       for (const { w, d, items } of days) {
         if (!items.length) continue;
         for (const slot of [...new Set(items.map((i) => i.slot || 1))]) {
           const its = items.filter((i) => (i.slot || 1) === slot);
-          const { data: u, error } = await sb.from("units").upsert({ date: isoDay(d.date), slot, kw: w.kw, phase: w.phase, week_hint: w.hint, changed_at: new Date().toISOString() }, { onConflict: "date,slot" }).select("id").single();
+          const ex = (exist || []).find((u) => u.date === isoDay(d.date) && u.slot === slot);
+          if (ex && (isoDay(d.date) < today || prot.has(ex.id))) { skipped++; continue; } // vergangene oder dokumentierte Tage bleiben unverändert
+          const { data: u, error } = await sb.from("units").upsert({ date: isoDay(d.date), slot, kw: w.kw, phase: w.phase, week_hint: w.hint }, { onConflict: "date,slot" }).select("id").single();
           if (error) return ($g.textContent = `${isoDay(d.date)}: ${error.message}`);
           await sb.from("plan_lines").delete().eq("unit_id", u.id);
           const { error: e2 } = await sb.from("plan_lines").insert(its.map((p) => ({ unit_id: u.id, position: p.pos, block: p.block, raw_text: p.raw, parsed: p, author_id: me.id, source_cell: p.cell })));
@@ -351,7 +415,7 @@ async function uploadPane(me) {
           n++; $g.textContent = `${n} Einheiten übernommen …`;
         }
       }
-      $g.textContent = `Fertig: ${n} Einheiten übernommen. Unter „Freigabe“ gibst du die Tage für die Athletinnen frei.`; toast("Plan übernommen");
+      $g.textContent = `Fertig: ${n} Einheiten übernommen${skipped ? `, ${skipped} unverändert gelassen (vergangen oder schon dokumentiert)` : ""}. Unter „Freigabe“ gibst du neue Tage frei.`; toast("Plan übernommen");
     };
   };
 }
@@ -359,10 +423,10 @@ async function uploadPane(me) {
 async function releasePane() {
   const $p = document.getElementById("pane");
   const today = isoDay(new Date());
-  const { data: units } = await sb.from("units").select("id,date,slot,kw,released,changed_at,released_at").gte("date", isoDay(new Date(Date.now() - 7 * 864e5))).order("date").order("slot").limit(40);
+  const { data: units } = await sb.from("units").select("id,date,slot,kw,released").gte("date", isoDay(new Date(Date.now() - 7 * 864e5))).order("date").order("slot").limit(40);
   $p.innerHTML = `<div class="card"><h3>Freigabe</h3><p class="muted">Athletinnen sehen freigegebene Tage bis einschließlich heute, nie künftige. Du kannst also ruhig im Voraus freigeben.</p>
     <div class="row"><label>Freigeben bis <input type="date" id="upto" value="${today}"></label><button class="btn" id="rel">Freigeben</button></div>
-    <div class="tablewrap"><table><thead><tr><th>Tag</th><th>KW</th><th>Status</th></tr></thead><tbody>${(units || []).map((u) => `<tr><td>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</td><td>${u.kw ?? ""}</td><td>${u.released ? (u.changed_at && u.released_at && new Date(u.changed_at) > new Date(u.released_at) ? `<span class="pill warn">freigegeben, danach geändert</span>` : `<span class="pill ok">freigegeben</span>`) : `<span class="pill">nicht freigegeben</span>`}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Noch keine Einheiten. Erst unter „Plan hochladen“ übernehmen.</td></tr>`}</tbody></table></div></div>`;
+    <div class="tablewrap"><table><thead><tr><th>Tag</th><th>KW</th><th>Status</th></tr></thead><tbody>${(units || []).map((u) => `<tr><td>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</td><td>${u.kw ?? ""}</td><td>${u.released ? `<span class="pill ok">freigegeben</span>` : `<span class="pill">nicht freigegeben</span>`}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Noch keine Einheiten. Erst unter „Plan hochladen“ übernehmen.</td></tr>`}</tbody></table></div></div>`;
   document.getElementById("rel").onclick = async () => {
     const upto = document.getElementById("upto").value;
     const { error } = await sb.from("units").update({ released: true, released_at: new Date().toISOString() }).lte("date", upto).eq("released", false);
@@ -540,7 +604,7 @@ async function diaryPane(me) {
     const plan = planFor(ath.name, adj.items, adj.rm);
     const di = new Map((e?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}`, i]));
     const blocks = []; for (const x of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === x.block) l.items.push(x); else blocks.push({ block: x.block, items: [x] }); }
-    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${(e.befinden?.length ? e.befinden : [e.status]).map((v) => `<span class="pill ${v === "fit" ? "ok" : ["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join("")}${dot(e.day_rating)}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
+    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${(e.befinden?.length ? e.befinden : [e.status]).map((v) => `<span class="pill ${v === "fit" ? "ok" : ["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join("")}${e.day_rating ? dot(e.day_rating) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
     const meta = e ? `${(e.chips || []).length ? `<p class="small">${esc(e.chips.join(" · "))}</p>` : ""}${e.note ? `<p class="small">„${esc(e.note)}“</p>` : ""}` : "";
     const body = blocks.map((b) => {
       const setI = di.get(`${b.items[0].lineId}|SET:${b.block}`);

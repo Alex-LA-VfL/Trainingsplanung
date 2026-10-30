@@ -24,7 +24,7 @@ const q = (data) => { const o = { select: () => o, eq: () => o, in: () => o, gte
   then: (r) => r({ data: Array.isArray(data) ? data : data ? [data] : [] }) }; return o; };
 export const createClient = () => ({
   auth: { getSession: async () => ({ data: { session: { user: { id: "u1", email: "t@t" } } } }), onAuthStateChange: () => {} },
-  from: (t) => q(t === "people" ? globalThis.__ME : t === "profiles" ? { code: "U16", volume_factor: 0.8, implements: {} } : t === "app_meta" ? null : []),
+  from: (t) => q(t === "people" ? globalThis.__ME : t === "profiles" ? { code: "U16", volume_factor: 0.8, implements: {} } : t === "app_meta" ? null : (globalThis.__DATA?.[t] ?? [])),
   rpc: async () => ({}),
 });`);
 let P;
@@ -46,23 +46,34 @@ if (P) {
 
 // 3 · App-Start
 const els = {};
-const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: "", scrollLeft: 0, scrollWidth: 0, querySelectorAll: () => [], querySelector: () => null,
-  prepend() {}, before() {}, setAttribute() {}, classList: { add() {}, remove() {} } });
-globalThis.document = { getElementById: (id) => els[id] || (els[id] = mk(id)), querySelectorAll: () => [], createElement: () => mk() };
+const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: "", scrollLeft: 0, scrollWidth: 0, querySelectorAll: () => [], querySelector: () => mk(),
+  prepend() {}, before() {}, setAttribute() {}, addEventListener() {}, classList: { add() {}, remove() {} } });
+globalThis.document = { getElementById: (id) => els[id] || (els[id] = mk(id)), querySelectorAll: () => [], createElement: () => mk(), addEventListener() {}, visibilityState: "visible" };
 globalThis.location = { origin: "x", pathname: "/", reload() {} };
 globalThis.window ??= {};
 if (!globalThis.navigator?.userAgent) globalThis.navigator = { userAgent: "test" };
 globalThis.fetch = async () => ({ json: async () => [] });
+// Ein Trainingstag aus dem Beispielplan als simulierte Datenbank (für die Tagesansicht der Athletin)
+if (P) {
+  const cat = P.makeCatalog(JSON.parse(fs.readFileSync(path.join(root, "data/uebungskatalog.json"), "utf8")));
+  const sample = JSON.parse(fs.readFileSync(path.join(root, "data/beispiel_kw44-53.json"), "utf8"));
+  const day = sample.weeks.flatMap((w) => w.days).find((d) => d.cells.length > 3);
+  const r = P.parseDay(day.cells, cat, sample.athletes);
+  const today = new Date().toISOString().slice(0, 10);
+  globalThis.__DATA = { units: [{ id: 1, date: today, slot: 1, kw: 1 }], plan_lines: r.items.map((p, i) => ({ id: i + 1, unit_id: 1, position: p.pos, block: p.block, raw_text: p.raw, parsed: p })) };
+}
 let rejected = null; process.on("unhandledRejection", (e) => { rejected = e; });
 for (const role of ["planer", "athletin"]) {
   for (const k in els) delete els[k];
-  globalThis.__ME = { id: "u1", name: "Test", role, active: true, consent_app_at: "2026-01-01", profile_code: "U16", sex: "w" };
+  globalThis.__ME = { id: "u1", name: role === "athletin" ? "Alena" : "Test", role, active: true, consent_app_at: "2026-01-01", profile_code: "U16", sex: "w" };
   rejected = null;
   try { await import(pathToFileURL(path.join(tmp, "app/app.js")) + "?" + role); } catch (e) { rejected = e; }
   await new Promise((r) => setTimeout(r, 300));
-  const html = els.app?.innerHTML || "";
+  const html = (els.app?.innerHTML || "") + (els.day?.innerHTML || "");
+  if (role === "athletin" && !/Speichern/.test(html)) { fail("Tagesansicht der Athletin wurde nicht aufgebaut" + (rejected ? ": " + rejected.stack : "") + " | " + html.replace(/<[^>]+>/g, " ").slice(0, 200)); continue; }
   if (rejected) fail(`App-Start (${role}): ${rejected.message}`);
   else if (!html || /Lädt/.test(html)) fail(`App-Start (${role}): nichts angezeigt`);
+  else if (role === "athletin" && !/Pause: /.test(html)) fail("Pausenangaben fehlen in der Tagesansicht");
   else ok(`App-Start (${role})`);
 }
 fs.rmSync(tmp, { recursive: true, force: true });

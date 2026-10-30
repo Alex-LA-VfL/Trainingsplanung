@@ -49,6 +49,20 @@ export function makeCatalog(entries) {
   };
 }
 
+/** Pausenangaben aus einer Planzeile: P, SP, TP, GP (mit Wert, TP/GP auch ohne) */
+export function extractPauses(text) {
+  const out = []; const t = String(text || "").replace(/\([^)]*\)/g, (m) => /\b(SP|TP|GP|P)\s*\d/.test(m) ? m : "");
+  const re = /(?:^|[\s,(])(SP|TP|GP|P)(?:\s*([\d][\d:,.]*\s*(?:''|'|min|s|sek)?|[A-ZÄÖÜ][a-zäöü]+)|(?=[\s,)]|$))/g;
+  let m;
+  while ((m = re.exec(t))) {
+    const k = m[1], v = (m[2] || "").trim();
+    if ((k === "P" || k === "SP") && !v) continue;
+    const s = v ? `${k} ${v}` : k;
+    if (!out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
 const splitTop = (s, sep = ",") => {
   const out = []; let d = 0, cur = "";
   for (const ch of s) {
@@ -232,7 +246,8 @@ export function planFor(athlete, dayItems, rm = {}, { markMissing = true } = {})
   const out = [];
   for (const p of dayItems) {
     if (p.only && !p.only.includes(athlete)) continue;
-    const base = { block: p.block, pos: p.pos, slot: p.slot, note: p.note, doku: DOKU[p.block] || "abhaken", type: p.type, lineId: p.lineId ?? null };
+    const pz = (p.pauses ?? extractPauses(p.raw)).join(" · ");
+    const base = { block: p.block, pos: p.pos, slot: p.slot, note: p.note, doku: DOKU[p.block] || "abhaken", type: p.type, lineId: p.lineId ?? null, pauses: pz || null };
     if (p.type === "strength" || p.type === "test") {
       for (const it of p.items) {
         let ex = it.exercise, name = ex ? ex.name : it.raw, replaced = null;
@@ -258,10 +273,10 @@ export function planFor(athlete, dayItems, rm = {}, { markMissing = true } = {})
         detail: p.stationList ? p.stationList.map((s) => s.exercise ? s.exercise.name : s.raw).join(" · ") : "Stationen wie beim letzten Zirkel" });
     } else if (p.type === "series") {
       out.push({ ...base, name: "Serie", dose: `${p.rounds}×${p.sub ? p.sub + "×" : ""}${p.reps || ""}`.replace(/×$/, "×"),
-        detail: p.items.map((i) => (i.count ? i.count + " " : "") + (i.exercise ? i.exercise.name : i.raw)).join(" · ") + (p.tail ? " + " + p.tail : "") });
+        detail: p.items.map((i) => (i.count ? i.count + " " : "") + (i.exercise ? i.exercise.name : i.raw)).join(" · ") + (p.tail ? " + " + p.tail.replace(/,?\s*\b(SP|TP|GP|P)\b\s*[\d:,.]*\s*('{1,2}|min|s)?/g, "").replace(/[,\s]+$/, "") : "") });
     } else if (p.type === "runs") {
       out.push({ ...base, name: p.exercise ? p.exercise.name : p.rawName, dose: `${p.series > 1 ? p.series + "×" : ""}${p.runs}${p.distance ? "×" + p.distance + " m" : " Läufe"}`,
-        detail: [p.pauseType, p.pause && "P " + p.pause, p.sp && "SP " + p.sp].filter(Boolean).join(" · ") });
+        detail: null });
     } else if (p.type === "sequence") {
       out.push({ ...base, name: p.exercise ? p.exercise.name : p.rawName, dose: `${p.rounds} Runden`, detail: p.parts.join(" → ") });
     } else if (p.type === "count") {
@@ -269,7 +284,7 @@ export function planFor(athlete, dayItems, rm = {}, { markMissing = true } = {})
     } else if (p.type === "time") {
       out.push({ ...base, name: p.exercise ? p.exercise.name : p.rawName, dose: `${p.minutes}'` });
     } else {
-      out.push({ ...base, name: p.exercise ? p.exercise.name : p.rawName, dose: "", detail: p.detail });
+      out.push({ ...base, name: p.exercise ? p.exercise.name : p.rawName, dose: "", detail: p.detail ? p.detail.replace(/\b(SP|TP|GP|P)\b\s*[\d:,.]*\s*('{1,2}|min|s)?/g, "").replace(/^[\s·,]+|[\s·,]+$/g, "") || null : null });
     }
   }
   return out;
