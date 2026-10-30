@@ -1,6 +1,6 @@
 // Service Worker: macht die App installierbar und zeigt bei fehlendem Netz die zuletzt geladene Version.
 // Immer zuerst aus dem Netz laden, damit neue Versionen sofort ankommen; Datenbank-Anfragen nie zwischenspeichern.
-const CACHE = "wurftraining-v1";
+const CACHE = "wurftraining-v2";
 self.addEventListener("install", (e) => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(
   caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())

@@ -16,7 +16,12 @@ const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const isoDow = (iso) => ((new Date(iso + "T12:00:00").getDay() + 6) % 7) + 1;
 const seesDay = (person, iso) => !person?.training_days?.length || person.training_days.includes(isoDow(iso));
 const daysText = (d) => (d?.length ? d.slice().sort().map((x) => WD[x - 1]).join(", ") : "alle Tage");
-const STATUS = ["fit", "müde", "gestresst", "Muskelkater", "krank", "verletzt"];
+const STATUS = ["fit", "müde", "gestresst", "Muskelkater"];
+const ABSENCE = ["krank", "verletzt", "Urlaub", "Schule", "Sonstiges"];
+const HEALTH = new Set(["krank", "verletzt"]);
+// Kennzeichnung eines Eintrags für Trainer-Ansichten: Abwesenheit oder Befinden
+const entryPills = (e) => e.absence ? `<span class="pill ${HEALTH.has(e.absence) ? "bad" : ""}">${esc(e.absence)}</span>`
+  : (e.befinden?.length ? e.befinden : [e.status]).map((v) => v === "fit" ? `<span class="pill ok">fit</span>` : `<span class="pill ${HEALTH.has(v) ? "bad" : "warn"}">${esc(v)}</span>`).join(" ");
 const SET_RATED = new Set(["Spezielle Würfe"]); // zusätzlich zu allen Blöcken mit Doku „Set“
 
 let catalog = null;
@@ -113,8 +118,8 @@ async function athleteView(me) {
   const today = isoDay(new Date());
   const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint").order("date", { ascending: false }).order("slot").limit(60);
   if (error) return ($app.innerHTML = `<div class="card">${esc(error.message)}</div>`);
-  const { data: diaries } = await sb.from("diary_entries").select("unit_id,day_rating").eq("athlete_id", me.id);
-  const done = new Map((diaries || []).map((d) => [d.unit_id, !!d.day_rating]));
+  const { data: diaries } = await sb.from("diary_entries").select("unit_id,day_rating,absence").eq("athlete_id", me.id);
+  const done = new Map((diaries || []).map((d) => [d.unit_id, !!d.day_rating || !!d.absence]));
   const cls = (id) => (done.has(id) ? (done.get(id) ? "done" : "part") : "");
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
   let cur = units.find((u) => u.date === today) || units[0];
@@ -147,7 +152,8 @@ async function dayForm(me, unit, onSaved) {
   const adj = applyDeviations(pr.items, rm0, devs || []);
   const plan = planFor(me.name, adj.items, adj.rm);
   const prev = new Map((entry?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}|${i.actual?.set || ""}`, i]));
-  const st = { befinden: new Set(entry?.befinden?.length ? entry.befinden : [entry?.status && entry.status !== "eingeschränkt" ? entry.status : "fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
+  const bef0 = (entry?.befinden || []).filter((v) => STATUS.includes(v));
+  const st = { absence: new Set(entry?.absence ? [entry.absence] : []), befinden: new Set(bef0.length ? bef0 : ["fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
 
   // Blöcke in Planreihenfolge bündeln
   const blocks = [];
@@ -160,9 +166,10 @@ async function dayForm(me, unit, onSaved) {
 
   let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${pills}</div>`;
   if (adj.notes.length) html += `<div class="card adj"><h3>Für dich angepasst</h3>${adj.notes.map((n) => `<p>${esc(n)}</p>`).join("")}</div>`;
-  html += `<div class="card"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
+  html += `<div class="card"><h3>Heute nicht im Training?</h3>${chipHTML("absence", ABSENCE, st.absence)}<p class="small muted absent-only">Grund gewählt: Der Plan ist ausgeblendet. Bei Bedarf kurz kommentieren und speichern.</p></div>`;
+  html += `<div class="card train"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
   blocks.forEach((b, bi) => {
-    html += `<section class="blk"><h3>${esc(b.block)}<small>${b.doku === "Set" ? "als Block bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></h3>`;
+    html += `<section class="blk train"><h3>${esc(b.block)}<small>${b.doku === "Set" ? "als Block bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></h3>`;
     b.items.forEach((e, ii) => {
       const key = `${e.lineId}|${e.name}|`;
       const old = prev.get(key);
@@ -186,9 +193,9 @@ async function dayForm(me, unit, onSaved) {
     }
     html += `</section>`;
   });
-  html += `<div class="card"><h3>Trainingstag gesamt</h3>${rateHTML("day", st.day)}<h3>Was war los?</h3>${chipHTML("neben", CHIPS_NEBEN, st.chips)}<textarea id="note" placeholder="Kommentar (freiwillig)">${esc(st.note)}</textarea>
+  html += `<div class="card"><div class="train stack"><h3>Trainingstag gesamt</h3>${rateHTML("day", st.day)}<h3>Was war los?</h3>${chipHTML("neben", CHIPS_NEBEN, st.chips)}</div><textarea id="note" placeholder="Kommentar (freiwillig)">${esc(st.note)}</textarea>
     <div class="row"><button class="btn" id="save">Speichern</button><span class="small muted" id="svst">${entry ? "gespeichert" : ""}</span></div>
-    <p class="small muted">Eingaben werden automatisch gespeichert, auch wenn das Handy zwischendurch in den Standby geht. „Tag gesamt“ kannst du am Ende ergänzen.</p></div>`;
+    <p class="small muted train">Eingaben werden automatisch gespeichert, auch wenn das Handy zwischendurch in den Standby geht. „Tag gesamt“ kannst du am Ende ergänzen.</p></div>`;
   $d.innerHTML = html;
 
   // Interaktion
@@ -203,18 +210,23 @@ async function dayForm(me, unit, onSaved) {
   $d.querySelectorAll(".rate").forEach((g) => { const s = g.querySelector('[aria-pressed="true"]'); if (s) ratings.set(g.dataset.key, +s.dataset.v); });
   const setChips = (g, vals) => { const s = new Set(vals); chipSel.set(g.dataset.key, s); g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(s.has(x.dataset.v)))); };
   $d.querySelectorAll(".chips").forEach((g) => {
-    const isStatus = g.dataset.key === "status";
+    const isStatus = g.dataset.key === "status", isAbs = g.dataset.key === "absence";
     chipSel.set(g.dataset.key, new Set([...g.querySelectorAll('[aria-pressed="true"]')].map((b) => b.dataset.v)));
     g.querySelectorAll("button").forEach((b) => (b.onclick = () => {
       const s = chipSel.get(g.dataset.key);
-      if (s.has(b.dataset.v)) s.delete(b.dataset.v); else s.add(b.dataset.v);
+      if (s.has(b.dataset.v)) s.delete(b.dataset.v); else { if (isAbs) s.clear(); s.add(b.dataset.v); }
       if (isStatus) { // „fit“ schließt alles andere aus
         if (b.dataset.v === "fit" && s.has("fit")) [...s].forEach((v) => v !== "fit" && s.delete(v));
         if (b.dataset.v !== "fit") s.delete("fit");
       }
-      setChips(g, [...s]); changed();
+      setChips(g, [...s]); if (isAbs) absentView(); changed();
     }));
   });
+  // Abwesend: Plan, Befinden und Tagesbewertung ausblenden
+  const absentNow = () => [...(chipSel.get("absence") || [])][0] || null;
+  const absentView = () => { const a = absentNow(); $d.classList.toggle("absent", !!a);
+    const n = document.getElementById("note"); if (n) n.placeholder = a === "Sonstiges" ? "Grund (bitte angeben)" : a ? "Kommentar (freiwillig, keine Diagnosen)" : "Kommentar (freiwillig)"; };
+  absentView();
   const addRow = (box, r = {}) => {
     const row = document.createElement("div"); row.className = "tr";
     row.innerHTML = `<input placeholder="Wurfform" value="${esc(r.form || "")}"><input placeholder="Gerät" value="${esc(r.geraet || "")}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n || "")}">`;
@@ -245,6 +257,7 @@ async function dayForm(me, unit, onSaved) {
       w.querySelectorAll(".tr").forEach((r) => r.remove()); (rows.length ? rows : [{}]).forEach((r) => addRow(w, r));
     });
     if (typeof d.note === "string") document.getElementById("note").value = d.note;
+    absentView();
   };
   try {
     const d = JSON.parse(localStorage.getItem(dkey) || "null");
@@ -270,10 +283,12 @@ async function dayForm(me, unit, onSaved) {
     busy = true;
     try {
       const snap = snapshot();
-      const bef = snap.chips.status || [];
-      const status = bef.includes("verletzt") ? "verletzt" : bef.includes("krank") ? "krank" : bef.find((v) => v !== "fit") || "fit";
-      const row = { athlete_id: me.id, unit_id: unit.id, status, befinden: bef.length ? bef : ["fit"], day_rating: snap.ratings.day || null,
-        chips: snap.chips.neben || [], note: snap.note.trim() || null, updated_at: new Date().toISOString() };
+      const absence = (snap.chips.absence || [])[0] || null;
+      if (manual && absence === "Sonstiges" && !snap.note.trim()) { toast("Bitte den Grund im Kommentar angeben"); document.getElementById("note")?.focus(); }
+      const bef = (snap.chips.status || []).filter((v) => STATUS.includes(v));
+      const status = absence ? (HEALTH.has(absence) ? absence : "abwesend") : bef.find((v) => v !== "fit") || "fit";
+      const row = { athlete_id: me.id, unit_id: unit.id, status, absence, befinden: absence ? [] : bef.length ? bef : ["fit"], day_rating: absence ? null : snap.ratings.day || null,
+        chips: absence ? [] : snap.chips.neben || [], note: snap.note.trim() || null, updated_at: new Date().toISOString() };
       const { data: saved, error } = await sb.from("diary_entries").upsert(row, { onConflict: "athlete_id,unit_id" }).select("id").single();
       if (error) throw error;
       const lineOf = (key) => +key.split("|")[0] || null;
@@ -286,15 +301,17 @@ async function dayForm(me, unit, onSaved) {
       for (const [k, v] of Object.entries(snap.done)) get(k).actual.done = v;
       for (const [k, v] of Object.entries(snap.throws)) { const it = get(k); it.actual.wuerfe = v.filter((r) => r.form || r.n); it.chips = snap.chips["t:" + k] || []; }
       await sb.from("diary_items").delete().eq("diary_id", saved.id);
+      if (absence) items.clear();
       if (items.size) { const { error: e2 } = await sb.from("diary_items").insert([...items.values()]); if (e2) throw e2; }
       const testRows = [...$d.querySelectorAll("[data-test]")].filter((i) => i.value.trim()).map((i) => ({ athlete_id: me.id, date: unit.date, test_type: "1RM",
         exercise_name: i.dataset.test, value: Number(i.value.replace(",", ".")), unit: "kg", context: "Test", created_by: me.id }));
-      if (testRows.length) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) throw et; }
+      if (testRows.length && !absence) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) throw et; }
       try { const d = JSON.parse(localStorage.getItem(dkey) || "null"); if (d && d.ts <= snap.ts) localStorage.removeItem(dkey); } catch {}
       const t = new Date();
-      if ($st()) $st().textContent = `gespeichert ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}${row.day_rating ? "" : " · Tag gesamt fehlt noch"}`;
-      if (manual) toast(row.day_rating ? "Gespeichert" : "Gespeichert – Tag gesamt fehlt noch");
-      onSaved(!!row.day_rating);
+      const ok = !!row.day_rating || !!absence;
+      if ($st()) $st().textContent = `gespeichert ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}${ok ? "" : " · Tag gesamt fehlt noch"}`;
+      if (manual && !(absence === "Sonstiges" && !row.note)) toast(ok ? "Gespeichert" : "Gespeichert – Tag gesamt fehlt noch");
+      onSaved(ok);
     } catch (e) {
       if ($st()) $st().textContent = navigator.onLine === false ? "offline – wird nachgeholt, deine Eingaben sind auf dem Handy gesichert" : "nicht gespeichert – erneuter Versuch …";
       if (manual) toast("Speichern fehlgeschlagen: " + (e.message || e));
@@ -337,17 +354,23 @@ async function feedbackPane(me) {
     sb.from("diary_entries").select("*, units(date,slot)").gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }),
   ]);
   const { data: openTests } = await sb.from("tests").select("*").eq("confirmed", false).order("date", { ascending: false });
-  // Hinweis Wiedereinstieg: die letzten 3 freigegebenen Einheiten krank/verletzt oder nicht dokumentiert
+  // Hinweis Wiedereinstieg: zusammenhängend nicht im Training (rückwärts ab der letzten Einheit)
+  // krank/verletzt ab 3 Einheiten, sonst (Urlaub, Schule, Sonstiges, nicht dokumentiert) ab 5
   const hints = (people || []).map((p) => {
-    const last3 = (units || []).filter((u) => seesDay(p, u.date)).slice(-3);
-    if (last3.length < 3) return { p, miss: 0 };
-    const miss = last3.filter((u) => { const e = (entries || []).find((x) => x.athlete_id === p.id && x.unit_id === u.id); return !e || ["krank", "verletzt"].includes(e.status); });
-    return { p, miss: miss.length };
-  }).filter((h) => h.miss >= 3);
+    const run = [];
+    for (const u of (units || []).filter((u) => seesDay(p, u.date)).reverse()) {
+      const e = (entries || []).find((x) => x.athlete_id === p.id && x.unit_id === u.id);
+      if (e && !e.absence && !HEALTH.has(e.status)) break;
+      run.push(e ? e.absence || e.status : "nicht dokumentiert");
+    }
+    const health = run.filter((r) => HEALTH.has(r)).length;
+    const counts = Object.entries(run.reduce((m, r) => ((m[r] = (m[r] || 0) + 1), m), {})).map(([k, n]) => `${n}× ${k}`).join(", ");
+    return { p, miss: run.length, health, counts };
+  }).filter((h) => h.health >= 3 || h.miss >= 5);
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
-  $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten krank, verletzt oder nicht dokumentiert.</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
+  $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten nicht im Training (${esc(h.counts)}).</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
     ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
-    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${(e.befinden?.length ? e.befinden : [e.status]).map((v) => v === "fit" ? "fit" : `<span class="pill ${["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join(" ")}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${entryPills(e)}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
   $p.querySelectorAll("[data-adjust]").forEach((b) => (b.onclick = () => deviationForm(document.getElementById("devform"), me, people, b.dataset.adjust, "Wiedereinstieg")));
   $p.querySelectorAll("[data-confirm]").forEach((b) => (b.onclick = async () => {
     const { error } = await sb.from("tests").update({ confirmed: true }).eq("id", +b.dataset.confirm);
@@ -604,7 +627,7 @@ async function diaryPane(me) {
     const plan = planFor(ath.name, adj.items, adj.rm);
     const di = new Map((e?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}`, i]));
     const blocks = []; for (const x of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === x.block) l.items.push(x); else blocks.push({ block: x.block, items: [x] }); }
-    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${(e.befinden?.length ? e.befinden : [e.status]).map((v) => `<span class="pill ${v === "fit" ? "ok" : ["krank", "verletzt"].includes(v) ? "bad" : "warn"}">${esc(v)}</span>`).join("")}${e.day_rating ? dot(e.day_rating) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
+    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${entryPills(e)}${e.absence ? "" : e.day_rating ? dot(e.day_rating) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
     const meta = e ? `${(e.chips || []).length ? `<p class="small">${esc(e.chips.join(" · "))}</p>` : ""}${e.note ? `<p class="small">„${esc(e.note)}“</p>` : ""}` : "";
     const body = blocks.map((b) => {
       const setI = di.get(`${b.items[0].lineId}|SET:${b.block}`);
@@ -615,7 +638,7 @@ async function diaryPane(me) {
         return `<div class="item"><div class="ihead"><span class="iname">${x.replaced ? `<span class="tag">statt ${esc(x.replaced)}</span>` : ""}${esc(x.name)}</span><span class="idose">${esc(x.dose)}</span></div>${ist || i?.rating ? `<div class="idetail">${i?.rating ? dot(i.rating) + " " : ""}${esc(ist)}</div>` : ""}</div>`;
       }).join("")}</div>`;
     }).join("");
-    return `<div class="card">${head}${adj.notes.length ? `<p class="small"><span class="pill warn">angepasst</span> ${esc(adj.notes.join(" · "))}</p>` : ""}${meta}${body}</div>`;
+    return `<div class="card">${head}${adj.notes.length ? `<p class="small"><span class="pill warn">angepasst</span> ${esc(adj.notes.join(" · "))}</p>` : ""}${meta}${e?.absence ? "" : body}</div>`;
   }).join("");
 }
 

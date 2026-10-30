@@ -47,7 +47,7 @@ if (P) {
 // 3 · App-Start
 const els = {};
 const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: "", scrollLeft: 0, scrollWidth: 0, querySelectorAll: () => [], querySelector: () => mk(),
-  prepend() {}, before() {}, setAttribute() {}, addEventListener() {}, classList: { add() {}, remove() {} } });
+  prepend() {}, before() {}, setAttribute() {}, addEventListener() {}, classList: { add() {}, remove() {}, toggle() {} } });
 globalThis.document = { getElementById: (id) => els[id] || (els[id] = mk(id)), querySelectorAll: () => [], createElement: () => mk(), addEventListener() {}, visibilityState: "visible" };
 globalThis.location = { origin: "x", pathname: "/", reload() {} };
 globalThis.window ??= {};
@@ -74,6 +74,7 @@ for (const role of ["planer", "athletin"]) {
   if (rejected) fail(`App-Start (${role}): ${rejected.message}`);
   else if (!html || /Lädt/.test(html)) fail(`App-Start (${role}): nichts angezeigt`);
   else if (role === "athletin" && !/Pause: /.test(html)) fail("Pausenangaben fehlen in der Tagesansicht");
+  else if (role === "athletin" && !(/Heute nicht im Training/.test(html) && /Urlaub/.test(html) && /blk train/.test(html))) fail("Abwesenheit fehlt in der Tagesansicht");
   else ok(`App-Start (${role})`);
 }
 fs.rmSync(tmp, { recursive: true, force: true });
