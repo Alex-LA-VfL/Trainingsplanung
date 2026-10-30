@@ -1,7 +1,7 @@
 # Planungssprache
 
 Eine Zeile ist ein Block. Jede Zeile steht in der Hauptblock-Zeile, zu der sie gehört.
-Pausen: `P` zwischen Sätzen · `SP` Serienpause · `TP` Trabpause · `GP` Gehpause.
+Pausen: `P` zwischen Sätzen · `SP` Serienpause · `TP` Trabpause · `GP` Gehpause. Sie werden überall erkannt und den Athletinnen angezeigt.
 
 | # | Wofür | Schreibweise | Beispiel |
 |---|---|---|---|
