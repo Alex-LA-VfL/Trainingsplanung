@@ -21,3 +21,8 @@ Im Code stehen keine Daten und keine geheimen Schlüssel. Der öffentliche Supab
 ## App
 `app/index.html` – Anmeldung mit E-Mail und Passwort (ohne Mailversand). Planer: Rückmeldungen mit Hinweis „Wiedereinstieg“, Tagebuch je Athletin, Abweichungen mit Anlass, Plan hochladen, Freigabe, Personen, Sicherung als Excel. Athletinnen: freigegebene Tage bis heute, Doku je Hauptblock.
 Adresse: https://alex-la-vfl.github.io/Trainingsplanung/app/
+
+## Betrieb
+- `.github/workflows/tests.yml`: prüft bei jedem Hochladen Module, Parser und App-Start (`node tests/run.mjs`)
+- `.github/workflows/wachhalten.yml`: ruft alle 3 Tage `ping()` auf, damit Supabase das Projekt nicht pausiert
+- Die App erinnert den Planer, wenn die letzte Sicherung älter als 7 Tage ist

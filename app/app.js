@@ -252,11 +252,20 @@ async function dayForm(me, unit, onSaved) {
 }
 
 // ───────────── Trainer ─────────────
+async function backupReminder() {
+  const { data } = await sb.from("app_meta").select("value").eq("key", "last_backup").maybeSingle();
+  const last = data?.value ? new Date(data.value) : null;
+  const days = last ? Math.floor((Date.now() - last.getTime()) / 864e5) : null;
+  if (last && days < 7) return "";
+  return `<div class="card adj"><p><b>Sicherung fällig:</b> ${last ? `letzte vor ${days} Tagen` : "noch keine Sicherung gemacht"}. Reiter „Sicherung“ → herunterladen → im Vereinskonto ablegen.</p></div>`;
+}
+
 async function trainerView(me) {
   const tabs = me.role === "planer" ? ["Rückmeldungen", "Tagebuch", "Plan hochladen", "Freigabe", "Personen", "Sicherung"] : ["Rückmeldungen", "Tagebuch"];
   let cur = tabs[0];
+  let reminder = me.role === "planer" ? await backupReminder() : "";
   const draw = () => {
-    $app.innerHTML = `<div class="tabs" role="tablist">${tabs.map((t) => `<button role="tab" aria-selected="${t === cur}">${t}</button>`).join("")}</div><div id="pane"></div>`;
+    $app.innerHTML = `${reminder}<div class="tabs" role="tablist">${tabs.map((t) => `<button role="tab" aria-selected="${t === cur}">${t}</button>`).join("")}</div><div id="pane"></div>`;
     $app.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => { cur = b.textContent; draw(); }));
     ({ "Rückmeldungen": feedbackPane, "Tagebuch": diaryPane, "Plan hochladen": uploadPane, "Freigabe": releasePane, "Personen": peoplePane, "Sicherung": backupPane })[cur](me);
   };
@@ -553,7 +562,7 @@ async function backupPane() {
     <div class="row"><button class="btn" id="bk">Sicherung herunterladen</button><span class="small muted" id="bkm"></span></div></div>`;
   document.getElementById("bk").onclick = async () => {
     const $m = document.getElementById("bkm"); const wb = XLSX.utils.book_new();
-    const tables = ["people", "units", "plan_lines", "diary_entries", "diary_items", "tests", "results", "deviations", "calendar_entries", "rules", "comments"];
+    const tables = ["app_meta", "profiles", "exercises", "people", "units", "plan_lines", "diary_entries", "diary_items", "tests", "results", "deviations", "calendar_entries", "rules", "comments"];
     for (const t of tables) {
       $m.textContent = `Lese ${t} …`;
       let rows = [], from = 0;
@@ -566,7 +575,8 @@ async function backupPane() {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flat.length ? flat : [{ leer: "" }]), t.slice(0, 31));
     }
     XLSX.writeFile(wb, `Trainingsplanung_Sicherung_${isoDay(new Date())}.xlsx`);
-    $m.textContent = "Fertig.";
+    await sb.from("app_meta").upsert({ key: "last_backup", value: new Date().toISOString(), updated_at: new Date().toISOString() });
+    $m.textContent = "Fertig. Datei im Vereinskonto ablegen.";
   };
 }
 
