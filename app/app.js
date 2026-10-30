@@ -580,4 +580,25 @@ async function backupPane() {
   };
 }
 
-start();
+// ───────────── Als App installieren ─────────────
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+let installEvt = null;
+window.addEventListener?.("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; installHint(); });
+function installHint() {
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone;
+  let dismissed = false; try { dismissed = localStorage.getItem("installHint") === "weg"; } catch {}
+  if (standalone || dismissed || document.getElementById("inst")) return;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!installEvt && !ios) return;
+  const box = document.createElement("div");
+  box.id = "inst"; box.className = "card install";
+  box.innerHTML = installEvt
+    ? `<p><b>Als App aufs Handy:</b> Symbol auf den Startbildschirm legen, dann öffnet sich die App direkt.</p><div class="row"><button class="btn" id="instgo">Installieren</button><button class="btn ghost" id="instno">Später</button></div>`
+    : `<p><b>Als App aufs Handy:</b> In Safari unten auf <b>Teilen</b> <span aria-hidden="true">⬆︎</span> tippen, dann <b>„Zum Home-Bildschirm“</b>.</p><div class="row"><button class="btn ghost" id="instno">Verstanden</button></div>`;
+  document.getElementById("app").prepend(box);
+  const go = document.getElementById("instgo");
+  if (go) go.onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; box.remove(); };
+  document.getElementById("instno").onclick = () => { try { localStorage.setItem("installHint", "weg"); } catch {} box.remove(); };
+}
+
+start().then(() => setTimeout(installHint, 800));

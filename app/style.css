@@ -76,3 +76,4 @@ code{font:13px var(--f-mono);background:var(--code);padding:1px 5px;border-radiu
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .adj{border-color:var(--mark);background:var(--mark-soft)}
 .daysel button{padding:3px 7px;font-size:12px}
+.install{border-color:var(--accent);background:var(--accent-soft)}

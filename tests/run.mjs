@@ -50,6 +50,8 @@ const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: 
   prepend() {}, before() {}, setAttribute() {}, classList: { add() {}, remove() {} } });
 globalThis.document = { getElementById: (id) => els[id] || (els[id] = mk(id)), querySelectorAll: () => [], createElement: () => mk() };
 globalThis.location = { origin: "x", pathname: "/", reload() {} };
+globalThis.window ??= {};
+if (!globalThis.navigator?.userAgent) globalThis.navigator = { userAgent: "test" };
 globalThis.fetch = async () => ({ json: async () => [] });
 let rejected = null; process.on("unhandledRejection", (e) => { rejected = e; });
 for (const role of ["planer", "athletin"]) {
