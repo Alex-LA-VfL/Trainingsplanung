@@ -200,9 +200,13 @@ async function dayForm(me, unit, onSaved) {
         const rows = old?.actual?.wuerfe?.length ? old.actual.wuerfe : [{ form: "", geraet: "", n: "" }];
         html += `<div class="throws" data-throws="${esc(key)}">${rows.map((r) => `<div class="tr"><input placeholder="Wurfform" value="${esc(r.form)}"><input placeholder="Gerät" value="${esc(r.geraet)}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n)}"></div>`).join("")}<button type="button" class="btn ghost" data-addrow>+ Wurfform</button></div>${chipHTML("t:" + key, CHIPS_TECHNIK, new Set(old?.chips || []))}`;
       }
-      if (b.doku !== "je Übung" && !e.test && (sc === 10 ? !blockRated(b) : b.doku !== "Set" && b.doku !== "Würfe" && !SET_RATED.has(b.block))) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
+      if (sc === 5 && b.doku !== "je Übung" && !e.test && b.doku !== "Set" && b.doku !== "Würfe" && !SET_RATED.has(b.block)) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
       html += `</div>`;
     });
+    if (sc === 10 && !blockRated(b) && b.doku !== "je Übung") { // ein Haken je Block
+      const dk = `${b.items[0].lineId}|DONE:${b.block}|`;
+      html += `<div class="item"><label class="check"><input type="checkbox" data-done="${esc(dk)}" ${prev.get(dk)?.actual?.done ? "checked" : ""}> ${b.items.length > 1 ? "Block erledigt" : "erledigt"}</label></div>`;
+    }
     if (blockRated(b)) {
       const sk = `${b.items[0].lineId}|SET:${b.block}|`;
       html += `<div class="item setrate"><span class="small muted">Wie anstrengend war ${b.block === "Zirkel" ? "der Zirkel" : "der Block"}?</span>${rateHTML("i:" + sk, prev.get(sk)?.rating ?? null)}</div>`;
@@ -662,9 +666,10 @@ async function diaryPane(me) {
     const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${entryPills(e)}${e.absence ? "" : e.day_rating != null ? dot(e.day_rating, rsc) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
     const meta = e ? `${(e.chips || []).length ? `<p class="small">${esc(e.chips.join(" · "))}</p>` : ""}${e.note ? `<p class="small">„${esc(e.note)}“</p>` : ""}` : "";
     const body = blocks.map((b) => {
+      const doneI = di.get(`${b.items[0].lineId}|DONE:${b.block}`)?.actual;
       const setI = di.get(`${b.items[0].lineId}|SET:${b.block}`), skI = di.get(`${b.items[0].lineId}|SKIP:${b.block}`)?.actual;
       if (skI?.skip) return `<div class="blk"><h3>${esc(b.block)}<span class="pill bad">✕ nicht gemacht${skI.reason ? " · " + esc(skI.reason) : ""}</span></h3>${skI.note ? `<div class="item idetail">„${esc(skI.note)}“</div>` : ""}</div>`;
-      return `<div class="blk"><h3>${esc(b.block)}${setI?.rating != null ? dot(setI.rating, rsc) : ""}</h3>${b.items.map((x) => {
+      return `<div class="blk"><h3>${esc(b.block)}${setI?.rating != null ? dot(setI.rating, rsc) : ""}${doneI?.done ? '<span class="pill ok">✓ erledigt</span>' : ""}</h3>${b.items.map((x) => {
         const i = di.get(`${x.lineId}|${x.name}`); const a = i?.actual || {};
         const ist = [a.ist && a.ist !== x.dose.split(" · ")[0] ? `Ist ${a.ist}` : "", a.kg != null ? `${String(a.kg).replace(".", ",")} kg` : "", a.done === true ? "✓" : a.done === false ? "nicht erledigt" : "",
           (a.wuerfe || []).map((w) => `${w.form || "Würfe"}${w.geraet ? " (" + w.geraet + ")" : ""}: ${w.n}`).join(" · "), (i?.chips || []).join(", ")].filter(Boolean).join(" · ");
