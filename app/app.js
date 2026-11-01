@@ -10,9 +10,9 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const toast = (t) => { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 3500); };
 const dShort = (iso) => { const d = new Date(iso + "T12:00:00"); return `${TAGE[(d.getDay() + 6) % 7]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`; };
 const RATE = ["leicht", "ok", "fordernd", "schwer", "am Limit"];
-// Ab KW 45/2026: Belastungsskala 0–10; ältere Tage behalten die Skala 1–5
+// Ab KW 45/2026: Belastungsskala 1–10; ältere Tage behalten die Skala 1–5
 const SCALE10_FROM = "2026-11-02";
-const RATE10 = ["Ruhe", "sehr leicht", "leicht", "moderat", "etwas anstrengend", "anstrengend", "", "sehr anstrengend", "", "", "maximal"];
+const RATE10 = [null, "sehr leicht", "leicht", "moderat", "etwas anstrengend", "anstrengend", "", "sehr anstrengend", "", "", "maximal"];
 const RATED10 = new Set(["Sprünge", "Sprint", "Tempoläufe", "Ausdauer", "Zirkel"]); // Blockbewertung; Kraft Langhantel und Spezielle Kraft je Übung
 const scaleOf = (iso) => (iso >= SCALE10_FROM ? 10 : 5);
 const rateLabel = (v, sc) => v == null ? "" : sc === 10 ? `${v}/10${RATE10[v] ? " · " + RATE10[v] : ""}` : `${v} · ${RATE[v - 1]}`;
@@ -172,7 +172,7 @@ async function dayForm(me, unit, onSaved) {
 
   const sc = scaleOf(unit.date);
   const rateHTML = (key, val) => sc === 10
-    ? `<div class="rate r10" data-key="${key}">${RATE10.map((r, v) => `<button type="button" data-v="${v}" style="--rc:var(--r${rateColor(v, 10)})" aria-pressed="${val === v}" title="${r || v}" aria-label="${v} ${r}">${v}</button>`).join("")}<span class="rlabel">${rateLabel(val, 10)}</span></div>`
+    ? `<div class="rate r10" data-key="${key}">${RATE10.map((r, v) => v === 0 ? "" : `<button type="button" data-v="${v}" style="--rc:var(--r${rateColor(v, 10)})" aria-pressed="${val === v}" title="${r || v}" aria-label="${v} ${r}">${v}</button>`).join("")}<span class="rlabel">${rateLabel(val, 10)}</span></div>`
     : `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}" title="${r}" aria-label="${i + 1} ${r}">${i + 1}</button>`).join("")}<span class="rlabel">${val ? RATE[val - 1] : ""}</span></div>`;
   const blockRated = (b) => sc === 10 ? RATED10.has(b.block) : b.doku === "Set" || SET_RATED.has(b.block);
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
@@ -183,7 +183,7 @@ async function dayForm(me, unit, onSaved) {
   html += `<div class="card train"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
   blocks.forEach((b, bi) => {
     const skk = `${b.items[0].lineId}|SKIP:${b.block}|`, sk0 = prev.get(skk)?.actual;
-    html += `<section class="blk train${sk0?.skip ? " skipped" : ""}" data-skipkey="${esc(skk)}" data-lines="${b.items.map((x) => x.lineId).join(",")}"><h3><span>${esc(b.block)} <small>${b.doku === "je Übung" ? "je Übung bewerten" : blockRated(b) ? "als Block bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : b.doku === "Set" ? "" : "abhaken"}</small></span><button type="button" class="skipbtn" aria-pressed="${!!sk0?.skip}">✕ nicht gemacht</button></h3>
+    html += `<section class="blk train${sk0?.skip ? " skipped" : ""}" data-skipkey="${esc(skk)}" data-lines="${b.items.map((x) => x.lineId).join(",")}"><h3><span>${esc(b.block)} <small>${b.doku === "je Übung" ? "je Übung bewerten" : blockRated(b) ? "als Block bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></span><button type="button" class="skipbtn" aria-pressed="${!!sk0?.skip}">✕ nicht gemacht</button></h3>
       <div class="item skipbox"><span class="small muted">Warum?</span>${chipHTML("s:" + skk, SKIP_REASONS, new Set(sk0?.reason ? [sk0.reason] : []))}<input data-skipnote="${esc(skk)}" placeholder="Kurz-Kommentar (freiwillig)" value="${esc(sk0?.note || "")}"></div>`;
     b.items.forEach((e, ii) => {
       const key = `${e.lineId}|${e.name}|`;
@@ -199,7 +199,8 @@ async function dayForm(me, unit, onSaved) {
       else if (b.doku === "Würfe") {
         const rows = old?.actual?.wuerfe?.length ? old.actual.wuerfe : [{ form: "", geraet: "", n: "" }];
         html += `<div class="throws" data-throws="${esc(key)}">${rows.map((r) => `<div class="tr"><input placeholder="Wurfform" value="${esc(r.form)}"><input placeholder="Gerät" value="${esc(r.geraet)}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n)}"></div>`).join("")}<button type="button" class="btn ghost" data-addrow>+ Wurfform</button></div>${chipHTML("t:" + key, CHIPS_TECHNIK, new Set(old?.chips || []))}`;
-      } else if (b.doku !== "Set" && !SET_RATED.has(b.block)) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
+      }
+      if (b.doku !== "je Übung" && !e.test && (sc === 10 ? !blockRated(b) : b.doku !== "Set" && b.doku !== "Würfe" && !SET_RATED.has(b.block))) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
       html += `</div>`;
     });
     if (blockRated(b)) {

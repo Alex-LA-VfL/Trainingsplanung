@@ -90,7 +90,7 @@ code{font:13px var(--f-mono);background:var(--code);padding:1px 5px;border-radiu
 .blk.skipped .item{display:none}
 .blk.skipped .item.skipbox{display:grid}
 .skipbox input{width:100%}
-.rate.r10{display:grid;grid-template-columns:repeat(11,minmax(0,34px));gap:3px}
+.rate.r10{display:grid;grid-template-columns:repeat(10,minmax(0,34px));gap:3px}
 .rate.r10 button{width:100%;height:auto;aspect-ratio:1;font-size:13px;min-width:0}
 .rate.r10 button[aria-pressed="true"]{background:var(--rc)!important;color:#fff}
 .rate.r10 .rlabel{grid-column:1/-1;margin:2px 0 0;min-height:1.2em}
