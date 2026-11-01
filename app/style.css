@@ -83,3 +83,10 @@ code{font:13px var(--f-mono);background:var(--code);padding:1px 5px;border-radiu
 #day.absent .train{display:none}
 #day.absent .absent-only{display:block}
 .stack{display:grid;gap:10px}
+.skipbtn{font:600 12px var(--f-body);background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:3px 9px;cursor:pointer;flex:0 0 auto;text-transform:none;letter-spacing:0}
+.skipbtn[aria-pressed="true"]{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.blk .skipbox{display:none}
+.blk.skipped>h3{opacity:.75}
+.blk.skipped .item{display:none}
+.blk.skipped .item.skipbox{display:grid}
+.skipbox input{width:100%}
