@@ -131,9 +131,9 @@ async function athleteView(me) {
   const done = new Map((diaries || []).map((d) => [d.unit_id, d.day_rating != null || !!d.absence]));
   const cls = (id) => (done.has(id) ? (done.get(id) ? "done" : "part") : "");
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
-  let cur = units.find((u) => u.date === today) || units[0];
+  let cur = units.find((u) => u.date === today) || units.find((u) => u.date <= today) || units[units.length - 1];
   const draw = async () => {
-    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
+    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : u.date > today ? "Vorschau" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
     const bar = $app.querySelector(".days"); bar.scrollLeft = bar.scrollWidth;
     $app.querySelectorAll(".days button").forEach((b) => (b.onclick = () => { cur = units.find((u) => u.id === +b.dataset.id); draw(); }));
     await dayForm(me, cur, (rated) => {
@@ -177,7 +177,7 @@ async function dayForm(me, unit, onSaved) {
   const blockRated = (b) => sc === 10 ? RATED10.has(b.block) : b.doku === "Set" || SET_RATED.has(b.block);
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
 
-  let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${pills}</div>`;
+  let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${unit.date > isoDay(new Date()) ? '<span class="pill warn">Vorschau</span>' : ""}${pills}</div>`;
   if (adj.notes.length) html += `<div class="card adj"><h3>Für dich angepasst</h3>${adj.notes.map((n) => `<p>${esc(n)}</p>`).join("")}</div>`;
   html += `<div class="card"><h3>Heute nicht im Training?</h3>${chipHTML("absence", ABSENCE, st.absence)}<p class="small muted absent-only">Grund gewählt: Der Plan ist ausgeblendet. Bei Bedarf kurz kommentieren und speichern.</p></div>`;
   html += `<div class="card train"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
@@ -493,7 +493,7 @@ async function peoplePane() {
   const PROF = (profiles || []).map((x) => x.code);
   const IMPL = ["Kugel", "Diskus", "Speer", "Hammer"];
   $p.innerHTML = `<div class="card"><h3>Personen</h3>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Trainingstage</th><th>Profil · w/m</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${x.role === "athletin" ? `<div class="chips daysel" data-pid="${esc(x.id)}">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${!!x.training_days?.includes(i + 1)}">${w}</button>`).join("")}</div><span class="small muted">${daysText(x.training_days)}</span>` : ""}</td><td>${x.role === "athletin" ? `<select class="psel" data-pid="${esc(x.id)}" data-f="profile_code"><option value="">–</option>${PROF.map((c) => `<option ${c === x.profile_code ? "selected" : ""}>${esc(c)}</option>`).join("")}</select> <select class="psel" data-pid="${esc(x.id)}" data-f="sex"><option value="">w/m</option><option value="w" ${x.sex === "w" ? "selected" : ""}>w</option><option value="m" ${x.sex === "m" ? "selected" : ""}>m</option></select>` : ""}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Rolle</th><th>Trainingstage</th><th>Profil · w/m</th><th>Einwilligung Papier</th><th>App bestätigt</th><th>aktiv</th><th></th></tr></thead><tbody>${(people || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${esc(x.role)}</td><td>${x.role === "athletin" ? `<div class="chips daysel" data-pid="${esc(x.id)}">${WD.map((w, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${!!x.training_days?.includes(i + 1)}">${w}</button>`).join("")}</div><span class="small muted">${daysText(x.training_days)}</span><label class="check small"><input type="checkbox" class="pv" data-pid="${esc(x.id)}" ${x.preview ? "checked" : ""}> Vorschau künftiger Tage</label>` : ""}</td><td>${x.role === "athletin" ? `<select class="psel" data-pid="${esc(x.id)}" data-f="profile_code"><option value="">–</option>${PROF.map((c) => `<option ${c === x.profile_code ? "selected" : ""}>${esc(c)}</option>`).join("")}</select> <select class="psel" data-pid="${esc(x.id)}" data-f="sex"><option value="">w/m</option><option value="w" ${x.sex === "w" ? "selected" : ""}>w</option><option value="m" ${x.sex === "m" ? "selected" : ""}>m</option></select>` : ""}</td><td>${esc(x.consent_on || "")}</td><td>${x.consent_app_at ? esc(x.consent_app_at.slice(0, 10)) : x.role === "athletin" ? '<span class="pill warn">offen</span>' : ""}</td><td>${x.active ? "ja" : "nein"}</td><td>${x.role !== "planer" ? `<button class="btn ghost" data-reset="${esc(x.id)}" data-name="${esc(x.name)}">Passwort zurücksetzen</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
     <form id="rf" class="row" hidden><span id="rname"></span><input id="rpw" minlength="8" required placeholder="Vorläufiges Passwort (mind. 8 Zeichen)" style="flex:1"><button class="btn">Setzen</button></form></div>
     <div class="card"><h3>Person freischalten</h3><p class="muted small">Die Athletin meldet sich einmal mit ihrer E-Mail an und schickt dir den angezeigten Code.</p>
     <form id="pf" class="row"><input id="pid" required placeholder="Code (ID)" style="flex:2 1 240px"><input id="pname" required placeholder="Name wie im Plan" style="flex:1 1 120px">
@@ -521,6 +521,10 @@ async function peoplePane() {
     if (error) return toast("Nicht gespeichert: " + error.message);
     g.nextElementSibling.textContent = daysText(days); toast("Trainingstage gespeichert");
   })));
+  $p.querySelectorAll(".pv").forEach((cb) => (cb.onchange = async () => {
+    const { error } = await sb.from("people").update({ preview: cb.checked }).eq("id", cb.dataset.pid);
+    toast(error ? "Nicht gespeichert: " + error.message : cb.checked ? "Vorschau an: sieht alle freigegebenen Tage" : "Vorschau aus");
+  }));
   $p.querySelectorAll(".psel").forEach((sel) => (sel.onchange = async () => {
     const { error } = await sb.from("people").update({ [sel.dataset.f]: sel.value || null }).eq("id", sel.dataset.pid);
     toast(error ? "Nicht gespeichert: " + error.message : "Gespeichert");
