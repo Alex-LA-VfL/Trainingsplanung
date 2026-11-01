@@ -10,6 +10,14 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const toast = (t) => { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 3500); };
 const dShort = (iso) => { const d = new Date(iso + "T12:00:00"); return `${TAGE[(d.getDay() + 6) % 7]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`; };
 const RATE = ["leicht", "ok", "fordernd", "schwer", "am Limit"];
+// Ab KW 45/2026: Belastungsskala 0–10; ältere Tage behalten die Skala 1–5
+const SCALE10_FROM = "2026-11-02";
+const RATE10 = ["Ruhe", "sehr leicht", "leicht", "moderat", "etwas anstrengend", "anstrengend", "", "sehr anstrengend", "", "", "maximal"];
+const RATED10 = new Set(["Sprünge", "Sprint", "Tempoläufe", "Ausdauer", "Zirkel"]); // Blockbewertung; Kraft Langhantel und Spezielle Kraft je Übung
+const scaleOf = (iso) => (iso >= SCALE10_FROM ? 10 : 5);
+const rateLabel = (v, sc) => v == null ? "" : sc === 10 ? `${v}/10${RATE10[v] ? " · " + RATE10[v] : ""}` : `${v} · ${RATE[v - 1]}`;
+const rateColor = (v, sc) => sc === 10 ? (v <= 2 ? 1 : v <= 3 ? 2 : v <= 5 ? 3 : v <= 7 ? 4 : 5) : v;
+const dot = (v, sc = 5) => v == null ? "" : `<span class="pill" style="background:var(--r${rateColor(v, sc)});color:${rateColor(v, sc) === 3 ? "#1d2320" : "#fff"}">${esc(rateLabel(v, sc))}</span>`;
 const CHIPS_TECHNIK = ["müde", "unkonzentriert", "Technik gut umgesetzt", "powervoll", "Spaß gehabt"];
 const CHIPS_NEBEN = ["wenig Schlaf", "Schule/Prüfung", "Ärger", "unglücklich", "kein Bock", "Alles supi!"];
 const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -120,7 +128,7 @@ async function athleteView(me) {
   const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint").order("date", { ascending: false }).order("slot").limit(60);
   if (error) return ($app.innerHTML = `<div class="card">${esc(error.message)}</div>`);
   const { data: diaries } = await sb.from("diary_entries").select("unit_id,day_rating,absence").eq("athlete_id", me.id);
-  const done = new Map((diaries || []).map((d) => [d.unit_id, !!d.day_rating || !!d.absence]));
+  const done = new Map((diaries || []).map((d) => [d.unit_id, d.day_rating != null || !!d.absence]));
   const cls = (id) => (done.has(id) ? (done.get(id) ? "done" : "part") : "");
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
   let cur = units.find((u) => u.date === today) || units[0];
@@ -154,7 +162,7 @@ async function dayForm(me, unit, onSaved) {
   const plan = planFor(me.name, adj.items, adj.rm);
   const prev = new Map((entry?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}|${i.actual?.set || ""}`, i]));
   const bef0 = (entry?.befinden || []).filter((v) => STATUS.includes(v));
-  const st = { absence: new Set(entry?.absence ? [entry.absence] : []), befinden: new Set(bef0.length ? bef0 : ["fit"]), day: entry?.day_rating || null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
+  const st = { absence: new Set(entry?.absence ? [entry.absence] : []), befinden: new Set(bef0.length ? bef0 : ["fit"]), day: entry?.day_rating ?? null, chips: new Set(entry?.chips || []), note: entry?.note || "", items: new Map() };
 
   // Blöcke in Planreihenfolge bündeln
   const blocks = [];
@@ -162,7 +170,11 @@ async function dayForm(me, unit, onSaved) {
   const pills = [...(cal || []).map((c) => `<span class="pill ${c.kind === "Feiertag" ? "bad" : c.kind === "Schulferien" ? "warn" : "ok"}">${esc(c.title)}</span>`),
     unit.week_hint ? `<span class="pill">${esc(unit.week_hint)}</span>` : ""].join("");
 
-  const rateHTML = (key, val) => `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}" title="${r}" aria-label="${i + 1} ${r}">${i + 1}</button>`).join("")}<span class="rlabel">${val ? RATE[val - 1] : ""}</span></div>`;
+  const sc = scaleOf(unit.date);
+  const rateHTML = (key, val) => sc === 10
+    ? `<div class="rate r10" data-key="${key}">${RATE10.map((r, v) => `<button type="button" data-v="${v}" style="--rc:var(--r${rateColor(v, 10)})" aria-pressed="${val === v}" title="${r || v}" aria-label="${v} ${r}">${v}</button>`).join("")}<span class="rlabel">${rateLabel(val, 10)}</span></div>`
+    : `<div class="rate" data-key="${key}">${RATE.map((r, i) => `<button type="button" data-v="${i + 1}" aria-pressed="${val === i + 1}" title="${r}" aria-label="${i + 1} ${r}">${i + 1}</button>`).join("")}<span class="rlabel">${val ? RATE[val - 1] : ""}</span></div>`;
+  const blockRated = (b) => sc === 10 ? RATED10.has(b.block) : b.doku === "Set" || SET_RATED.has(b.block);
   const chipHTML = (key, list, sel) => `<div class="chips" data-key="${key}">${list.map((c) => `<button type="button" data-v="${esc(c)}" aria-pressed="${sel.has(c)}">${esc(c)}</button>`).join("")}</div>`;
 
   let html = `<div class="row"><h2>${dShort(unit.date)}${unit.slot === 2 ? " · Einheit 2" : ""}</h2>${pills}</div>`;
@@ -171,7 +183,7 @@ async function dayForm(me, unit, onSaved) {
   html += `<div class="card train"><h3>Wie geht's dir?</h3>${chipHTML("status", STATUS, st.befinden)}</div>`;
   blocks.forEach((b, bi) => {
     const skk = `${b.items[0].lineId}|SKIP:${b.block}|`, sk0 = prev.get(skk)?.actual;
-    html += `<section class="blk train${sk0?.skip ? " skipped" : ""}" data-skipkey="${esc(skk)}" data-lines="${b.items.map((x) => x.lineId).join(",")}"><h3><span>${esc(b.block)} <small>${b.doku === "Set" ? "als Block bewerten" : b.doku === "je Übung" ? "je Übung bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : "abhaken"}</small></span><button type="button" class="skipbtn" aria-pressed="${!!sk0?.skip}">✕ nicht gemacht</button></h3>
+    html += `<section class="blk train${sk0?.skip ? " skipped" : ""}" data-skipkey="${esc(skk)}" data-lines="${b.items.map((x) => x.lineId).join(",")}"><h3><span>${esc(b.block)} <small>${b.doku === "je Übung" ? "je Übung bewerten" : blockRated(b) ? "als Block bewerten" : b.doku === "Würfe" ? "Würfe eintragen" : b.doku === "Set" ? "" : "abhaken"}</small></span><button type="button" class="skipbtn" aria-pressed="${!!sk0?.skip}">✕ nicht gemacht</button></h3>
       <div class="item skipbox"><span class="small muted">Warum?</span>${chipHTML("s:" + skk, SKIP_REASONS, new Set(sk0?.reason ? [sk0.reason] : []))}<input data-skipnote="${esc(skk)}" placeholder="Kurz-Kommentar (freiwillig)" value="${esc(sk0?.note || "")}"></div>`;
     b.items.forEach((e, ii) => {
       const key = `${e.lineId}|${e.name}|`;
@@ -181,7 +193,7 @@ async function dayForm(me, unit, onSaved) {
       if (e.pauses) html += `<div class="idetail pause">Pause: ${esc(e.pauses)}</div>`;
       if (b.doku === "je Übung" && !e.test) {
         const planKg = (e.dose.match(/([\d]+(?:,\d+)?) kg/) || [])[1] || "";
-        html += `<div class="ist"><label>Ist <input data-ist="${esc(key)}" value="${esc(old?.actual?.ist ?? e.dose.split(" · ")[0])}"></label><label>kg <input data-kg="${esc(key)}" inputmode="decimal" style="width:76px" placeholder="kg" value="${esc(old?.actual?.kg ?? planKg)}"></label></div>${rateHTML("i:" + key, old?.rating || null)}`;
+        html += `<div class="ist"><label>Ist <input data-ist="${esc(key)}" value="${esc(old?.actual?.ist ?? e.dose.split(" · ")[0])}"></label><label>kg <input data-kg="${esc(key)}" inputmode="decimal" style="width:76px" placeholder="kg" value="${esc(old?.actual?.kg ?? planKg)}"></label></div>${rateHTML("i:" + key, old?.rating ?? null)}`;
       }
       else if (e.test) html += `<label class="ist">Maximalgewicht kg <input data-test="${esc(e.name)}" data-ist="${esc(key)}" inputmode="decimal" value="${esc(old?.actual?.ist ?? "")}"></label>`;
       else if (b.doku === "Würfe") {
@@ -190,9 +202,9 @@ async function dayForm(me, unit, onSaved) {
       } else if (b.doku !== "Set" && !SET_RATED.has(b.block)) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
       html += `</div>`;
     });
-    if (b.doku === "Set" || SET_RATED.has(b.block)) {
+    if (blockRated(b)) {
       const sk = `${b.items[0].lineId}|SET:${b.block}|`;
-      html += `<div class="item setrate"><span class="small muted">Wie schwer war ${b.block === "Zirkel" ? "der Zirkel" : "der Block"}?</span>${rateHTML("i:" + sk, prev.get(sk)?.rating || null)}</div>`;
+      html += `<div class="item setrate"><span class="small muted">Wie anstrengend war ${b.block === "Zirkel" ? "der Zirkel" : "der Block"}?</span>${rateHTML("i:" + sk, prev.get(sk)?.rating ?? null)}</div>`;
     }
     html += `</section>`;
   });
@@ -207,7 +219,7 @@ async function dayForm(me, unit, onSaved) {
   const $st = () => document.getElementById("svst");
   const setRate = (g, v) => {
     g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(+x.dataset.v === v)));
-    g.querySelector(".rlabel").textContent = v ? RATE[v - 1] : ""; ratings.set(g.dataset.key, v);
+    g.querySelector(".rlabel").textContent = sc === 10 ? rateLabel(v, 10) : v ? RATE[v - 1] : ""; ratings.set(g.dataset.key, v);
   };
   $d.querySelectorAll(".rate").forEach((g) => g.querySelectorAll("button").forEach((b) => (b.onclick = () => { setRate(g, +b.dataset.v); changed(); })));
   $d.querySelectorAll(".rate").forEach((g) => { const s = g.querySelector('[aria-pressed="true"]'); if (s) ratings.set(g.dataset.key, +s.dataset.v); });
@@ -256,7 +268,7 @@ async function dayForm(me, unit, onSaved) {
     skiplines: [...$d.querySelectorAll("section.skipped[data-lines]")].flatMap((x) => x.dataset.lines.split(",").map(Number)),
   });
   const restore = (d) => {
-    for (const [k, v] of Object.entries(d.ratings || {})) { const g = [...$d.querySelectorAll(".rate")].find((x) => x.dataset.key === k); if (g && v) setRate(g, v); }
+    for (const [k, v] of Object.entries(d.ratings || {})) { const g = [...$d.querySelectorAll(".rate")].find((x) => x.dataset.key === k); if (g && v != null) setRate(g, v); }
     for (const [k, v] of Object.entries(d.chips || {})) { const g = [...$d.querySelectorAll(".chips")].find((x) => x.dataset.key === k); if (g) setChips(g, v); }
     $d.querySelectorAll("[data-ist]").forEach((i) => { if (i.dataset.ist in (d.ist || {})) i.value = d.ist[i.dataset.ist]; });
     $d.querySelectorAll("[data-kg]").forEach((i) => { if (i.dataset.kg in (d.kg || {})) i.value = d.kg[i.dataset.kg]; });
@@ -298,7 +310,7 @@ async function dayForm(me, unit, onSaved) {
       if (manual && absence === "Sonstiges" && !snap.note.trim()) { toast("Bitte den Grund im Kommentar angeben"); document.getElementById("note")?.focus(); }
       const bef = (snap.chips.status || []).filter((v) => STATUS.includes(v));
       const status = absence ? (HEALTH.has(absence) ? absence : "abwesend") : bef.find((v) => v !== "fit") || "fit";
-      const row = { athlete_id: me.id, unit_id: unit.id, status, absence, befinden: absence ? [] : bef.length ? bef : ["fit"], day_rating: absence ? null : snap.ratings.day || null,
+      const row = { athlete_id: me.id, unit_id: unit.id, status, absence, befinden: absence ? [] : bef.length ? bef : ["fit"], day_rating: absence ? null : snap.ratings.day ?? null, scale: sc,
         chips: absence ? [] : snap.chips.neben || [], note: snap.note.trim() || null, updated_at: new Date().toISOString() };
       const { data: saved, error } = await sb.from("diary_entries").upsert(row, { onConflict: "athlete_id,unit_id" }).select("id").single();
       if (error) throw error;
@@ -306,7 +318,7 @@ async function dayForm(me, unit, onSaved) {
       const nameOf = (key) => key.split("|")[1];
       const items = new Map();
       const get = (key) => { if (!items.has(key)) items.set(key, { diary_id: saved.id, plan_line_id: lineOf(key), actual: { name: nameOf(key) }, rating: null, chips: [] }); return items.get(key); };
-      for (const [k, v] of Object.entries(snap.ratings)) if (k.startsWith("i:") && v) get(k.slice(2)).rating = v;
+      for (const [k, v] of Object.entries(snap.ratings)) if (k.startsWith("i:") && v != null) get(k.slice(2)).rating = v;
       for (const [k, v] of Object.entries(snap.ist)) get(k).actual.ist = v;
       for (const [k, v] of Object.entries(snap.kg)) get(k).actual.kg = v.trim() ? Number(v.replace(",", ".")) : null;
       for (const [k, v] of Object.entries(snap.done)) get(k).actual.done = v;
@@ -323,7 +335,7 @@ async function dayForm(me, unit, onSaved) {
       if (testRows.length && !absence) { const { error: et } = await sb.from("tests").upsert(testRows, { onConflict: "athlete_id,date,test_type,exercise_name" }); if (et) throw et; }
       try { const d = JSON.parse(localStorage.getItem(dkey) || "null"); if (d && d.ts <= snap.ts) localStorage.removeItem(dkey); } catch {}
       const t = new Date();
-      const ok = !!row.day_rating || !!absence;
+      const ok = row.day_rating != null || !!absence;
       if ($st()) $st().textContent = `gespeichert ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}${ok ? "" : " · Tag gesamt fehlt noch"}`;
       if (manual && !(absence === "Sonstiges" && !row.note)) toast(ok ? "Gespeichert" : "Gespeichert – Tag gesamt fehlt noch");
       onSaved(ok);
@@ -385,7 +397,7 @@ async function feedbackPane(me) {
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
   $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten nicht im Training (${esc(h.counts)}).</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
     ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
-    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${entryPills(e)}</td><td>${e.day_rating ? `${e.day_rating} · ${RATE[e.day_rating - 1]}` : ""}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+    <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${entryPills(e)}</td><td>${esc(rateLabel(e.day_rating, e.scale ?? 5))}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
   $p.querySelectorAll("[data-adjust]").forEach((b) => (b.onclick = () => deviationForm(document.getElementById("devform"), me, people, b.dataset.adjust, "Wiedereinstieg")));
   $p.querySelectorAll("[data-confirm]").forEach((b) => (b.onclick = async () => {
     const { error } = await sb.from("tests").update({ confirmed: true }).eq("id", +b.dataset.confirm);
@@ -633,7 +645,6 @@ async function diaryPane(me) {
     sb.from("deviations").select("*").eq("athlete_id", sel).in("unit_id", ids),
   ]);
   const rm0 = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm0)) rm0[t.exercise_name] = Number(t.value);
-  const dot = (v) => v ? `<span class="pill" style="background:var(--r${v});color:${v === 3 ? "#1d2320" : "#fff"}">${v} · ${RATE[v - 1]}</span>` : "";
   document.getElementById("dplist").innerHTML = units.map((u) => {
     const e = (entries || []).find((x) => x.unit_id === u.id);
     const its = (lines || []).filter((l) => l.unit_id === u.id).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block })).sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
@@ -641,17 +652,18 @@ async function diaryPane(me) {
     const adj = applyDeviations(pr.items, rm0, (devs || []).filter((d) => d.unit_id === u.id));
     const plan = planFor(ath.name, adj.items, adj.rm);
     const di = new Map((e?.diary_items || []).map((i) => [`${i.plan_line_id}|${i.actual?.name || ""}`, i]));
+    const rsc = e?.scale ?? scaleOf(u.date);
     const blocks = []; for (const x of plan) { const l = blocks[blocks.length - 1]; if (l && l.block === x.block) l.items.push(x); else blocks.push({ block: x.block, items: [x] }); }
-    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${entryPills(e)}${e.absence ? "" : e.day_rating ? dot(e.day_rating) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
+    const head = `<div class="row" style="justify-content:space-between"><h3>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</h3>${e ? `<span class="row">${entryPills(e)}${e.absence ? "" : e.day_rating != null ? dot(e.day_rating, rsc) : '<span class="pill">Tag gesamt fehlt</span>'}</span>` : `<span class="pill warn">nicht dokumentiert</span>`}</div>`;
     const meta = e ? `${(e.chips || []).length ? `<p class="small">${esc(e.chips.join(" · "))}</p>` : ""}${e.note ? `<p class="small">„${esc(e.note)}“</p>` : ""}` : "";
     const body = blocks.map((b) => {
       const setI = di.get(`${b.items[0].lineId}|SET:${b.block}`), skI = di.get(`${b.items[0].lineId}|SKIP:${b.block}`)?.actual;
       if (skI?.skip) return `<div class="blk"><h3>${esc(b.block)}<span class="pill bad">✕ nicht gemacht${skI.reason ? " · " + esc(skI.reason) : ""}</span></h3>${skI.note ? `<div class="item idetail">„${esc(skI.note)}“</div>` : ""}</div>`;
-      return `<div class="blk"><h3>${esc(b.block)}${setI?.rating ? dot(setI.rating) : ""}</h3>${b.items.map((x) => {
+      return `<div class="blk"><h3>${esc(b.block)}${setI?.rating != null ? dot(setI.rating, rsc) : ""}</h3>${b.items.map((x) => {
         const i = di.get(`${x.lineId}|${x.name}`); const a = i?.actual || {};
         const ist = [a.ist && a.ist !== x.dose.split(" · ")[0] ? `Ist ${a.ist}` : "", a.kg != null ? `${String(a.kg).replace(".", ",")} kg` : "", a.done === true ? "✓" : a.done === false ? "nicht erledigt" : "",
           (a.wuerfe || []).map((w) => `${w.form || "Würfe"}${w.geraet ? " (" + w.geraet + ")" : ""}: ${w.n}`).join(" · "), (i?.chips || []).join(", ")].filter(Boolean).join(" · ");
-        return `<div class="item"><div class="ihead"><span class="iname">${x.replaced ? `<span class="tag">statt ${esc(x.replaced)}</span>` : ""}${esc(x.name)}</span><span class="idose">${esc(x.dose)}</span></div>${ist || i?.rating ? `<div class="idetail">${i?.rating ? dot(i.rating) + " " : ""}${esc(ist)}</div>` : ""}</div>`;
+        return `<div class="item"><div class="ihead"><span class="iname">${x.replaced ? `<span class="tag">statt ${esc(x.replaced)}</span>` : ""}${esc(x.name)}</span><span class="idose">${esc(x.dose)}</span></div>${ist || i?.rating != null ? `<div class="idetail">${i?.rating != null ? dot(i.rating, rsc) + " " : ""}${esc(ist)}</div>` : ""}</div>`;
       }).join("")}</div>`;
     }).join("");
     return `<div class="card">${head}${adj.notes.length ? `<p class="small"><span class="pill warn">angepasst</span> ${esc(adj.notes.join(" · "))}</p>` : ""}${meta}${e?.absence ? "" : body}</div>`;
