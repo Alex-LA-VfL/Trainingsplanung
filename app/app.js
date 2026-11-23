@@ -366,13 +366,13 @@ async function backupReminder() {
 }
 
 async function trainerView(me) {
-  const tabs = me.role === "planer" ? ["Rückmeldungen", "Tagebuch", "Plan hochladen", "Freigabe", "Personen", "Sicherung"] : ["Rückmeldungen", "Tagebuch"];
+  const tabs = me.role === "planer" ? ["Rückmeldungen", "Tagebuch", "Maximalkraft", "Plan hochladen", "Freigabe", "Personen", "Sicherung"] : ["Rückmeldungen", "Tagebuch", "Maximalkraft"];
   let cur = tabs[0];
   let reminder = me.role === "planer" ? await backupReminder() : "";
   const draw = () => {
     $app.innerHTML = `${reminder}<div class="tabs" role="tablist">${tabs.map((t) => `<button role="tab" aria-selected="${t === cur}">${t}</button>`).join("")}</div><div id="pane"></div>`;
     $app.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => { cur = b.textContent; draw(); }));
-    ({ "Rückmeldungen": feedbackPane, "Tagebuch": diaryPane, "Plan hochladen": uploadPane, "Freigabe": releasePane, "Personen": peoplePane, "Sicherung": backupPane })[cur](me);
+    ({ "Rückmeldungen": feedbackPane, "Tagebuch": diaryPane, "Maximalkraft": strengthPane, "Plan hochladen": uploadPane, "Freigabe": releasePane, "Personen": peoplePane, "Sicherung": backupPane })[cur](me);
   };
   draw();
 }
@@ -400,14 +400,91 @@ async function feedbackPane(me) {
     return { p, miss: run.length, health, counts };
   }).filter((h) => h.health >= 3 || h.miss >= 5);
   const name = (id) => (people || []).find((p) => p.id === id)?.name || "?";
-  $p.innerHTML = `${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten nicht im Training (${esc(h.counts)}).</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
+  $p.innerHTML = `<div class="card" id="trend"><h3>Verlauf „Tag gesamt“</h3><p class="muted small">Lädt …</p></div>${hints.length ? `<div class="card"><h3>Wiedereinstieg prüfen</h3>${hints.map((h) => `<div class="row" style="justify-content:space-between"><p><b>${esc(h.p.name)}</b>: die letzten ${h.miss} Einheiten nicht im Training (${esc(h.counts)}).</p><button class="btn ghost" data-adjust="${esc(h.p.id)}">Anpassen</button></div>`).join("")}<div id="devform"></div></div>` : ""}
     ${(openTests || []).length ? `<div class="card"><h3>Neue Testwerte bestätigen</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Übung</th><th>Wert</th><th></th></tr></thead><tbody>${openTests.map((t) => `<tr><td>${dShort(t.date)}</td><td>${esc(name(t.athlete_id))}</td><td>${esc(t.exercise_name || t.test_type)}</td><td>${esc(t.value)} ${esc(t.unit)}</td><td><button class="btn ghost" data-confirm="${t.id}">bestätigen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
     <div class="card"><h3>Rückmeldungen der letzten 4 Wochen</h3>${(entries || []).length ? `<div class="tablewrap"><table><thead><tr><th>Tag</th><th>Athletin</th><th>Status</th><th>Tag gesamt</th><th>Nebenfaktoren</th><th>Kommentar</th></tr></thead><tbody>${entries.map((e) => `<tr><td>${e.units ? dShort(e.units.date) : ""}</td><td>${esc(name(e.athlete_id))}</td><td>${entryPills(e)}</td><td>${esc(rateLabel(e.day_rating, e.scale ?? 5))}</td><td>${esc((e.chips || []).join(", "))}</td><td>${esc(e.note || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Rückmeldungen.</p>`}</div>`;
+  trendMap(document.getElementById("trend"));
   $p.querySelectorAll("[data-adjust]").forEach((b) => (b.onclick = () => deviationForm(document.getElementById("devform"), me, people, b.dataset.adjust, "Wiedereinstieg")));
   $p.querySelectorAll("[data-confirm]").forEach((b) => (b.onclick = async () => {
     const { error } = await sb.from("tests").update({ confirmed: true }).eq("id", +b.dataset.confirm);
     if (error) return toast(error.message); toast("Bestätigt"); feedbackPane();
   }));
+}
+
+// Verlauf „Tag gesamt“: Athletinnen × Einheiten, Farbe = Bewertung (nur Skala 1–10, ab Umstellung)
+async function trendMap($el, weeks = trendMap.weeks || 6) {
+  const today = isoDay(new Date());
+  let since = isoDay(new Date(Date.now() - weeks * 7 * 864e5)); if (since < SCALE10_FROM) since = SCALE10_FROM;
+  const [{ data: people }, { data: units }] = await Promise.all([
+    sb.from("people").select("id,name,training_days,preview").eq("role", "athletin").eq("active", true).order("name"),
+    sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date").order("slot"),
+  ]);
+  const ath = (people || []).filter((p) => !p.preview), us = units || [];
+  const { data: entries } = us.length ? await sb.from("diary_entries").select("athlete_id,unit_id,day_rating,scale,absence,status,befinden,chips,note,diary_items(actual)").in("unit_id", us.map((u) => u.id)) : { data: [] };
+  const E = new Map((entries || []).map((e) => [`${e.athlete_id}|${e.unit_id}`, e]));
+  const ABBR = { krank: "K", verletzt: "V", Urlaub: "U", Schule: "S", Sonstiges: "–" };
+  const cell = (p, u, wk = "") => {
+    if (!seesDay(p, u.date)) return `<td class="hm-off${wk}"></td>`;
+    const e = E.get(`${p.id}|${u.id}`);
+    if (!e) return `<td class="${wk}"><span class="hm hm-miss" title="${dShort(u.date)}: nicht dokumentiert"></span></td>`;
+    if (e.absence) return `<td class="${wk}"><span class="hm hm-abs${HEALTH.has(e.absence) ? " bad" : ""}" title="${dShort(u.date)}: ${esc(e.absence)}${e.note ? " – " + esc(e.note) : ""}">${ABBR[e.absence]}</span></td>`;
+    const v = e.day_rating, bef = (e.befinden || []).filter((x) => x !== "fit"), skips = (e.diary_items || []).filter((i) => i.actual?.skip).length;
+    const tip = [`${dShort(u.date)}: ${v != null ? rateLabel(v, 10) : "Tag gesamt fehlt"}`, bef.join(", "), (e.chips || []).join(", "), skips ? `${skips} Block nicht gemacht` : "", e.note ? `„${e.note}“` : ""].filter(Boolean).join(" · ");
+    return `<td class="${wk}"><span class="hm${v == null ? " hm-nor" : ""}${bef.length ? " hm-bef" : ""}${skips ? " hm-skip" : ""}" style="${v != null ? `--c:var(--r${rateColor(v, 10)})` : ""}" title="${esc(tip)}">${v ?? "?"}</span></td>`;
+  };
+  const vals = (p) => us.map((u) => E.get(`${p.id}|${u.id}`)).filter((e) => e && !e.absence && e.day_rating != null).map((e) => e.day_rating);
+  const avg = (a) => (a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1).replace(".", ",") : "–");
+  const grp = us.map((u) => { const a = ath.map((p) => E.get(`${p.id}|${u.id}`)).filter((e) => e && !e.absence && e.day_rating != null).map((e) => e.day_rating); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; });
+  const mon = (u, i) => i > 0 && isoDow(u.date) < isoDow(us[i - 1].date) ? " hm-wk" : "";
+  $el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Verlauf „Tag gesamt“</h3><div class="chips" id="hmw">${[4, 6, 12].map((w) => `<button type="button" data-w="${w}" aria-pressed="${w === weeks}">${w} Wo.</button>`).join("")}</div></div>
+    ${us.length ? `<div class="tablewrap"><table class="hmtab"><thead><tr><th></th>${us.map((u, i) => `<th class="${mon(u, i)}" title="${dShort(u.date)}">${dShort(u.date).slice(3, 6)}<br>${dShort(u.date).slice(0, 2)}</th>`).join("")}<th>Ø</th><th>doku</th></tr></thead><tbody>
+    ${ath.map((p) => { const n = us.filter((u) => seesDay(p, u.date)).length, d = us.filter((u) => seesDay(p, u.date) && E.has(`${p.id}|${u.id}`)).length;
+      return `<tr><th>${esc(p.name)}</th>${us.map((u, i) => cell(p, u, mon(u, i))).join("")}<td class="hm-sum">${avg(vals(p))}</td><td class="hm-sum">${d}/${n}</td></tr>`; }).join("")}
+    <tr class="hm-grp"><th>Ø Gruppe</th>${grp.map((g, i) => `<td class="${mon(us[i], i)}">${g == null ? "" : `<span class="hm" style="--c:var(--r${rateColor(Math.round(g), 10)})">${g.toFixed(1).replace(".", ",")}</span>`}</td>`).join("")}<td></td><td></td></tr>
+    </tbody></table></div>
+    <p class="small muted hm-legend"><span class="hm" style="--c:var(--r1)">2</span> leicht … <span class="hm" style="--c:var(--r5)">9</span> maximal · <span class="hm hm-abs bad">K</span> krank/verletzt · <span class="hm hm-abs">U</span> Urlaub/Schule · <span class="hm hm-miss"></span> nicht dokumentiert · <span class="hm hm-bef" style="--c:var(--r3)">5</span> müde/gestresst/Muskelkater · <span class="hm hm-skip" style="--c:var(--r3)">5</span> Block ausgelassen. Antippen bzw. Maus drüber zeigt Details.</p>`
+    : `<p class="muted small">Seit der Umstellung auf die Skala 1–10 (${dShort(SCALE10_FROM)}) wurde noch nichts freigegeben.</p>`}`;
+  $el.querySelectorAll("#hmw button").forEach((b) => (b.onclick = () => { trendMap.weeks = +b.dataset.w; trendMap($el, +b.dataset.w); }));
+  const tw = $el.querySelector(".tablewrap"); if (tw) tw.scrollLeft = tw.scrollWidth; // neueste Tage zuerst sichtbar
+  $el.querySelectorAll(".hm[title]").forEach((x) => (x.onclick = () => toast(x.title)));
+}
+
+// Maximalkraft: Übung × Athletin, letzter Wert mit Veränderung zum vorigen Test
+async function strengthPane() {
+  const $p = document.getElementById("pane");
+  const [{ data: people }, { data: tests }, catalog] = await Promise.all([
+    sb.from("people").select("id,name,preview").eq("role", "athletin").eq("active", true).order("name"),
+    sb.from("tests").select("athlete_id,exercise_name,date,value,confirmed").eq("test_type", "1RM").order("date"),
+    cat(),
+  ]);
+  const ath = (people || []).filter((p) => !p.preview);
+  const H = new Map(); // "ex|athlete" -> [{date,value,confirmed}] aufsteigend
+  for (const t of tests || []) { if (!t.exercise_name) continue; const k = `${t.exercise_name}|${t.athlete_id}`; (H.get(k) || H.set(k, []).get(k)).push({ ...t, value: Number(t.value) }); }
+  const order = new Map((catalog?.entries || catalog?.list || []).map((e, i) => [e.name, i]));
+  const exs = [...new Set((tests || []).map((t) => t.exercise_name).filter(Boolean))].sort((a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999) || a.localeCompare(b, "de"));
+  const recent = isoDay(new Date(Date.now() - 21 * 864e5));
+  const kg = (v) => String(v).replace(".", ",");
+  const spark = (h) => {
+    if (h.length < 2) return "";
+    const vs = h.map((x) => x.value), lo = Math.min(...vs), hi = Math.max(...vs), w = 64, ht = 18;
+    const pts = h.map((x, i) => `${(i / (h.length - 1)) * (w - 4) + 2},${hi === lo ? ht / 2 : ht - 2 - ((x.value - lo) / (hi - lo)) * (ht - 4)}`);
+    return `<svg class="spark" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}" aria-hidden="true"><polyline points="${pts.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="${pts.at(-1).split(",")[0]}" cy="${pts.at(-1).split(",")[1]}" r="2.2" fill="currentColor"/></svg>`;
+  };
+  const cellOf = (h) => {
+    if (!h?.length) return `<td class="mk-empty">–</td>`;
+    const last = h.at(-1), prev = h.at(-2), first = h[0];
+    const d = prev ? last.value - prev.value : null, pc = prev ? (d / prev.value) * 100 : null;
+    const cls = d == null ? "" : d > 0 ? "up" : d < 0 ? "down" : "same";
+    const tip = h.map((x) => `${dShort(x.date)} ${String(x.date).slice(2, 4)}: ${kg(x.value)} kg${x.confirmed ? "" : " (unbestätigt)"}`).join("\n") + (h.length > 2 ? `\nseit erstem Test: ${last.value - first.value >= 0 ? "+" : ""}${kg(+(last.value - first.value).toFixed(1))} kg (${(((last.value - first.value) / first.value) * 100).toFixed(0)} %)` : "");
+    return `<td class="mk${last.date >= recent ? " mk-new" : ""}" title="${esc(tip)}"><div class="mk-v">${kg(last.value)}<small> kg</small>${last.confirmed ? "" : '<span class="pill warn" title="noch nicht bestätigt">?</span>'}</div>
+      ${d != null ? `<div class="mk-d ${cls}">${d > 0 ? "▲ +" : d < 0 ? "▼ " : "= "}${kg(+d.toFixed(1))} kg · ${pc > 0 ? "+" : ""}${pc.toFixed(0)} %</div>` : `<div class="mk-d small muted">erster Test</div>`}
+      <div class="mk-f"><span class="small muted">${dShort(last.date).slice(3)}${String(last.date).slice(2, 4)}</span><span class="${cls}">${spark(h)}</span></div></td>`;
+  };
+  $p.innerHTML = `<div class="card"><h3>Maximalkraft (1RM)</h3>
+    <p class="small muted">Letzter Testwert je Übung; darunter die Veränderung zum vorigen Test und der Verlauf aller Tests. Grün hinterlegt: Test der letzten 3 Wochen. Antippen bzw. Maus drüber zeigt alle Werte.</p>
+    ${exs.length ? `<div class="tablewrap"><table class="mktab"><thead><tr><th>Übung</th>${ath.map((p) => `<th>${esc(p.name)}</th>`).join("")}</tr></thead><tbody>
+    ${exs.map((x) => `<tr><th>${esc(x)}</th>${ath.map((p) => cellOf(H.get(`${x}|${p.id}`))).join("")}</tr>`).join("")}</tbody></table></div>` : `<p class="muted">Noch keine Testwerte.</p>`}</div>`;
+  $p.querySelectorAll("td.mk[title]").forEach((x) => (x.onclick = () => toast(x.title.replace(/\n/g, " · "))));
 }
 
 async function uploadPane(me) {
