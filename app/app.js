@@ -133,7 +133,7 @@ async function athleteView(me) {
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
   let cur = units.find((u) => u.date === today) || units.find((u) => u.date <= today) || units[units.length - 1];
   const draw = async () => {
-    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : u.date > today ? "Vorschau" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
+    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}${u.date === today ? " today" : ""}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : u.date > today ? "Vorschau" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
     const bar = $app.querySelector(".days"); bar.scrollLeft = bar.scrollWidth;
     $app.querySelectorAll(".days button").forEach((b) => (b.onclick = () => { cur = units.find((u) => u.id === +b.dataset.id); draw(); }));
     await dayForm(me, cur, (rated) => {
