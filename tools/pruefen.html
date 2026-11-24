@@ -88,14 +88,14 @@ select{font:14px var(--f-body);padding:6px 8px;border:1px solid var(--line);bord
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 /*__INLINE_PARSER__*/
-import { makeCatalog, parseDay, planFor, HAUPTBLOECKE, DOKU } from "../src/planungssprache.js";
+import { makeCatalog, parseDay, planFor, HAUPTBLOECKE, DOKU, mergeCatalog } from "../src/planungssprache.js";
 /*__END_INLINE_PARSER__*/
 /*__INLINE_DATA__*/
 const CATALOG = await (await fetch("../data/uebungskatalog.json")).json();
 const SAMPLE = await (await fetch("../data/beispiel_kw44-53.json")).json();
 /*__END_INLINE_DATA__*/
 
-const cat = makeCatalog(CATALOG);
+let cat = makeCatalog(CATALOG);
 const DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const colL = (i) => { let s = ""; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
@@ -130,7 +130,24 @@ function readWorkbook(wb) {
   let athletes = [];
   const as = wb.Sheets["Athletinnen"];
   if (as) athletes = XLSX.utils.sheet_to_json(as, { header: 1 }).slice(1).map((r) => r && r[0]).filter(Boolean).map(String);
-  return { athletes, weeks, sheetName };
+  return { athletes, weeks, sheetName, catalog: readCatalogSheet(wb) };
+}
+
+/** Blatt „Übungskatalog“ der Excel (gleich wie src/excel.js) */
+function readCatalogSheet(wb) {
+  const sn = wb.SheetNames.find((n) => /^übungskatalog/i.test(n.trim())); if (!sn) return null;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null });
+  const hi = rows.findIndex((r) => r && r.some((v) => String(v ?? "").trim() === "Übung")); if (hi < 0) return null;
+  const H = rows[hi].map((v) => String(v ?? "").trim()); const ci = (re) => H.findIndex((h) => re.test(h));
+  const cN = ci(/^Übung$/), cB = ci(/^Hauptblock/), cC = ci(/^Zählart/), cR = ci(/1RM/), cS = ci(/^Status/), cA = ci(/^Schreibweise/);
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || []; const name = String(r[cN] ?? "").trim(); if (!name) continue;
+    const aliases = cA >= 0 && r[cA] ? String(r[cA]).split(/\s*;\s*/).map((x) => x.replace(/\s*\(\d+\)\s*$/, "").trim()).filter(Boolean) : [];
+    out.push({ name, block: String(r[cB] ?? "").trim(), count: cC >= 0 ? String(r[cC] ?? "").trim() : "", rm: cR >= 0 && /^(ja|x|1|true)$/i.test(String(r[cR] ?? "").trim()),
+      status: cS >= 0 && String(r[cS] ?? "").trim() ? String(r[cS]).trim() : "aktiv", aliases, row: i + 1 });
+  }
+  return out;
 }
 
 let DATA = null, ath = null, wk = 0, day = 0;
@@ -179,7 +196,8 @@ function load(file) {
   const fr = new FileReader();
   fr.onload = () => {
     try { const wb = XLSX.read(new Uint8Array(fr.result), { type: "array", cellDates: true }); const d = readWorkbook(wb);
-      document.getElementById("src").textContent = `${file.name} · Blatt „${d.sheetName}“ · ${d.weeks.length} Wochen`; analyse(d); }
+      const mc = mergeCatalog(CATALOG, d.catalog); cat = makeCatalog(mc.entries);
+      document.getElementById("src").textContent = `${file.name} · Blatt „${d.sheetName}“ · ${d.weeks.length} Wochen${d.catalog ? ` · Übungskatalog aus der Excel (${d.catalog.length} Übungen)` : ""}${mc.problems.length ? " · Katalog: " + mc.problems.map((p) => p.text).join(" | ") : ""}`; analyse(d); }
     catch (e) { document.getElementById("src").textContent = `Datei konnte nicht gelesen werden: ${e.message}`; }
   };
   fr.readAsArrayBuffer(file);

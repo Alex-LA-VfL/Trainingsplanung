@@ -129,3 +129,12 @@ code{font:13px var(--f-mono);background:var(--code);padding:1px 5px;border-radiu
 .up{color:var(--accent)} .down{color:var(--bad)} .same{color:var(--muted)}
 .mk-empty{color:var(--muted)}
 .spark{display:block}
+/* Trainingsfrei */
+.days button.free{border-style:dashed;background:transparent;color:var(--muted)}
+.days button.free small{color:var(--accent);font-weight:600}
+.days button.free[aria-pressed="true"]{border-style:solid;background:var(--accent-soft);color:var(--ink)}
+.freecard{gap:14px}
+.free-head{display:flex;align-items:center;gap:12px}
+.free-tip,.free-week{display:grid;gap:4px;padding:12px 14px;border-radius:12px;background:var(--accent-soft)}
+.free-week{background:var(--code)}
+.free-mini{padding:10px 14px;color:var(--muted)}

@@ -22,6 +22,30 @@ const norm = (s) => String(s).toLowerCase()
   .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
   .replace(/\bund\b|\bu\.\s?/g, "").replace(/[^a-z0-9]/g, "");
 
+/** Katalog aus der Excel (Blatt „Übungskatalog“) mit dem mitgelieferten Katalog zusammenführen.
+ *  Excel gewinnt bei Hauptblock, Zählart, %1RM und Status; Schreibweisen werden vereinigt;
+ *  Übungen, die nur im mitgelieferten Katalog stehen, bleiben erhalten.
+ *  Ergebnis: { entries, problems:[{level,text,cell}] } */
+export function mergeCatalog(base, sheet) {
+  if (!sheet) return { entries: base, problems: [] };
+  const problems = [], seen = new Map(), aliasOwner = new Map();
+  const byName = new Map(base.map((e) => [norm(e.name), e]));
+  const entries = [];
+  for (const x of sheet) {
+    const where = `Übungskatalog Zeile ${x.row}`;
+    if (!HAUPTBLOECKE.includes(x.block)) { problems.push({ level: "Fehler", text: `${where}: „${x.name}“ hat ${x.block ? `den unbekannten Hauptblock „${x.block}“` : "keinen Hauptblock"}`, cell: where }); continue; }
+    const k = norm(x.name);
+    if (seen.has(k)) { problems.push({ level: "Hinweis", text: `${where}: „${x.name}“ steht doppelt (auch Zeile ${seen.get(k)}); die erste Zeile gilt`, cell: where }); continue; }
+    seen.set(k, x.row);
+    const b = byName.get(k);
+    const aliases = [...new Set([...x.aliases, ...(b?.aliases || [])])];
+    for (const a of [x.name, ...aliases]) { const n = norm(a); const o = aliasOwner.get(n); if (o && o !== x.name) problems.push({ level: "Hinweis", text: `${where}: Schreibweise „${a}“ (bei „${x.name}“) gehört schon zu „${o}“ – im Plan wird dafür „${o}“ erkannt`, cell: where }); else aliasOwner.set(n, x.name); }
+    entries.push({ ...(b || {}), name: x.name, block: x.block, count: x.count || b?.count || "", rm: x.rm, status: x.status, aliases });
+  }
+  for (const e of base) if (!seen.has(norm(e.name))) entries.push(e);
+  return { entries, problems };
+}
+
 /** Übungskatalog mit Schreibweisen → Nachschlagefunktion */
 export function makeCatalog(entries) {
   const map = new Map();

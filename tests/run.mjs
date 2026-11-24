@@ -44,6 +44,18 @@ if (P) {
   problems.length ? fail(`Parser: ${problems.length} Fehler\n  ` + problems.slice(0, 10).join("\n  ")) : ok(`Parser: ${lines} Zeilen ohne Fehler`);
 }
 
+// 2b · Übungskatalog aus der Excel: neue Übung mitten in der Liste, falscher Hauptblock wird gemeldet
+if (P) {
+  const base = JSON.parse(fs.readFileSync(path.join(root, "data/uebungskatalog.json"), "utf8"));
+  const sheet = [{ name: "Hampelmann", block: "Aufwärmen", count: "Minuten", rm: false, status: "aktiv", aliases: ["Hampelm."], row: 4 },
+    { name: "Falsch", block: "Aufwärm", count: "", rm: false, status: "aktiv", aliases: [], row: 5 }];
+  const mc = P.mergeCatalog(base, sheet), c = P.makeCatalog(mc.entries);
+  const r = P.parseDay([{ block: "Aufwärmen", lines: ["10' Hampelm."], cell: "F7" }], c, []);
+  const errs = r.problems.filter((p) => p.level === "Fehler");
+  !errs.length && r.items[0]?.exercise?.name === "Hampelmann" && mc.problems.some((p) => p.level === "Fehler" && /Aufwärm/.test(p.text)) && mc.entries.length >= base.length
+    ? ok("Übungskatalog aus der Excel wird übernommen") : fail("Übungskatalog aus der Excel: " + JSON.stringify({ errs, item: r.items[0]?.exercise?.name, mc: mc.problems }));
+}
+
 // 3 · App-Start
 const els = {};
 const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: "", scrollLeft: 0, scrollWidth: 0, querySelectorAll: () => [], querySelector: () => mk(),

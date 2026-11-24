@@ -1,6 +1,6 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { makeCatalog, parseDay, planFor, applyProfile, HAUPTBLOECKE } from "../src/planungssprache.js";
+import { makeCatalog, parseDay, planFor, applyProfile, HAUPTBLOECKE, mergeCatalog } from "../src/planungssprache.js";
 import { readWorkbook, isoDay, TAGE } from "../src/excel.js";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -125,7 +125,7 @@ function showPending(user) {
 async function athleteView(me) {
   if (!me.consent_app_at) return consentScreen(me);
   const today = isoDay(new Date());
-  const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint").order("date", { ascending: false }).order("slot").limit(60);
+  const { data: units, error } = await sb.from("units").select("id,date,slot,kw,phase,week_hint,free,day_note").order("date", { ascending: false }).order("slot").limit(60);
   if (error) return ($app.innerHTML = `<div class="card">${esc(error.message)}</div>`);
   const { data: diaries } = await sb.from("diary_entries").select("unit_id,day_rating,absence").eq("athlete_id", me.id);
   const done = new Map((diaries || []).map((d) => [d.unit_id, d.day_rating != null || !!d.absence]));
@@ -133,15 +133,43 @@ async function athleteView(me) {
   if (!units.length) return ($app.innerHTML = `<div class="card"><h2>Noch kein Training freigegeben</h2><p class="muted">Sobald dein Trainer den nächsten Tag freigibt, erscheint er hier.</p></div>`);
   let cur = units.find((u) => u.date === today) || units.find((u) => u.date <= today) || units[units.length - 1];
   const draw = async () => {
-    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${cls(u.id)}${u.date === today ? " today" : ""}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.date === today ? "heute" : u.date > today ? "Vorschau" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
+    $app.innerHTML = `<div class="days" role="group" aria-label="Trainingstag">${units.slice().reverse().map((u) => `<button data-id="${u.id}" aria-pressed="${u.id === cur.id}" class="${u.free ? "free" : cls(u.id)}${u.date === today ? " today" : ""}">${dShort(u.date)}${u.slot === 2 ? " E2" : ""}<small>${u.free ? (u.date === today ? "heute frei" : "frei") : u.date === today ? "heute" : u.date > today ? "Vorschau" : "KW " + (u.kw ?? "")}</small></button>`).join("")}</div><div id="day"></div>`;
     const bar = $app.querySelector(".days"); bar.scrollLeft = bar.scrollWidth;
     $app.querySelectorAll(".days button").forEach((b) => (b.onclick = () => { cur = units.find((u) => u.id === +b.dataset.id); draw(); }));
+    if (cur.free) return freeDay(me, cur);
     await dayForm(me, cur, (rated) => {
       done.set(cur.id, rated);
       const b = $app.querySelector(`.days button[data-id="${cur.id}"]`); if (b) b.className = cls(cur.id);
     });
   };
   draw();
+}
+
+// Trainingsfreier Tag: kein Formular, dafür Erholungstipp und Rückblick auf die eigene Woche
+const FREE_TIPS = [
+  ["Schlaf", "Heute 30 Minuten früher ins Bett – im Schlaf passiert die Anpassung ans Training."],
+  ["Trinken", "Über den Tag verteilt Wasser oder Tee, ruhig 2 Liter."],
+  ["Locker bewegen", "Spaziergang oder entspanntes Radfahren bringen die Durchblutung in Gang, ohne zu belasten."],
+  ["Mobi light", "10 Minuten Hüfte, Brustwirbelsäule und Schultern mobilisieren – ganz ohne Anstrengung."],
+  ["Essen", "Eiweiß und Kohlenhydrate füllen die Speicher für die nächste Einheit."],
+  ["Kopf frei", "Zeit mit Freunden, Familie oder einem Hobby – Abstand gehört dazu."],
+  ["Rückblick", "Was ist dir diese Woche im Training richtig gut gelungen? Merk es dir für den nächsten Wettkampf."],
+  ["Muskelkater", "Wärme und lockere Bewegung tun gut, Dehnen nur sanft."],
+];
+async function freeDay(me, unit) {
+  const $d = document.getElementById("day");
+  const n = Math.floor(new Date(unit.date + "T12:00:00").getTime() / 864e5) % FREE_TIPS.length, [tt, tx] = FREE_TIPS[n];
+  const from = isoDay(new Date(new Date(unit.date + "T12:00:00").getTime() - 7 * 864e5));
+  const { data: es } = await sb.from("diary_entries").select("day_rating,scale,absence,units!inner(date,free)").eq("athlete_id", me.id).gte("units.date", from).lt("units.date", unit.date);
+  const trained = (es || []).filter((e) => !e.absence && !e.units?.free), r10 = trained.filter((e) => e.scale === 10 && e.day_rating != null).map((e) => e.day_rating);
+  const avg = r10.length ? (r10.reduce((a, b) => a + b, 0) / r10.length).toFixed(1).replace(".", ",") : null;
+  $d.innerHTML = `<div class="card freecard">
+      <div class="free-head"><svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="var(--accent-soft)"/><path d="M30 14a11 11 0 1 0 4 15 9 9 0 0 1-4-15z" fill="var(--accent)"/></svg>
+      <div><h2>Trainingsfrei</h2><p class="muted">${dShort(unit.date)}${unit.day_note ? " · " + esc(unit.day_note) : ""}</p></div></div>
+      <p><b>Erholung ist Teil des Trainings.</b> Heute gibt es nichts zu dokumentieren.</p>
+      <div class="free-tip"><span class="small muted">Tipp für heute</span><b>${esc(tt)}</b><span>${esc(tx)}</span></div>
+      ${trained.length ? `<div class="free-week"><span class="small muted">Deine letzten 7 Tage</span><div class="row"><span class="pill ok">${trained.length} ${trained.length === 1 ? "Einheit" : "Einheiten"} dokumentiert</span>${avg ? `<span class="pill">Ø Tag gesamt ${avg}/10</span>` : ""}</div></div>` : ""}
+    </div>`;
 }
 
 async function dayForm(me, unit, onSaved) {
@@ -384,7 +412,7 @@ async function feedbackPane(me) {
   const since = isoDay(new Date(Date.now() - 28 * 864e5)); const today = isoDay(new Date());
   const [{ data: people }, { data: units }, { data: entries }] = await Promise.all([
     sb.from("people").select("id,name,role,active,training_days").eq("role", "athletin").eq("active", true).order("name"),
-    sb.from("units").select("id,date,slot,released").gte("date", since).lte("date", today).eq("released", true).order("date"),
+    sb.from("units").select("id,date,slot,released").gte("date", since).lte("date", today).eq("released", true).eq("free", false).order("date"),
     sb.from("diary_entries").select("*, units(date,slot)").gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }),
   ]);
   const { data: openTests } = await sb.from("tests").select("*").eq("confirmed", false).order("date", { ascending: false });
@@ -419,7 +447,7 @@ async function trendMap($el, weeks = trendMap.weeks || 6) {
   let since = isoDay(new Date(Date.now() - weeks * 7 * 864e5)); if (since < SCALE10_FROM) since = SCALE10_FROM;
   const [{ data: people }, { data: units }] = await Promise.all([
     sb.from("people").select("id,name,training_days,preview").eq("role", "athletin").eq("active", true).order("name"),
-    sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date").order("slot"),
+    sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).eq("free", false).order("date").order("slot"),
   ]);
   const ath = (people || []).filter((p) => !p.preview), us = units || [];
   const { data: entries } = us.length ? await sb.from("diary_entries").select("athlete_id,unit_id,day_rating,scale,absence,status,befinden,chips,note,diary_items(actual)").in("unit_id", us.map((u) => u.id)) : { data: [] };
@@ -499,20 +527,22 @@ async function uploadPane(me) {
     let data;
     try { data = readWorkbook(XLSX, XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array", cellDates: true })); }
     catch (e) { return ($r.innerHTML = `<p>Datei konnte nicht gelesen werden: ${esc(e.message)}</p>`); }
-    const c = await cat();
+    const mc = mergeCatalog((await cat()).entries, data.catalog); // Blatt „Übungskatalog“ der Excel gilt, Position egal
+    const c = makeCatalog(mc.entries);
     const { data: ppl } = await sb.from("people").select("name").eq("role", "athletin");
     const athletes = (ppl || []).map((p) => p.name);
     const notYet = data.athletes.filter((n) => !athletes.includes(n));
-    const days = []; const problems = [];
+    const days = []; const problems = [...mc.problems];
     for (const w of data.weeks) w.days.forEach((d, di) => {
       d.cells.filter((x) => !HAUPTBLOECKE.includes(x.block)).forEach((x) => problems.push({ level: "Fehler", text: `Unbekannter Hauptblock „${x.block}“`, cell: x.cell, where: `KW ${w.kw} ${TAGE[di]}` }));
       const r = parseDay(d.cells, c, [...new Set([...athletes, ...data.athletes])]);
       r.problems.forEach((p) => problems.push({ ...p, where: `KW ${w.kw} ${TAGE[di]}` }));
       if (d.date) days.push({ w, d, items: r.items });
+      if (r.items.length && /^\s*frei\b/i.test(d.termine || "")) problems.push({ level: "Hinweis", text: "Als „frei“ markiert, enthält aber Trainingsinhalte – die Inhalte werden übernommen", where: `KW ${w.kw} ${TAGE[di]}` });
     });
     const errs = problems.filter((p) => p.level === "Fehler");
     const lines = days.reduce((a, x) => a + x.items.length, 0);
-    $r.innerHTML = `<p><b>${data.weeks.length}</b> Wochen · <b>${days.filter((x) => x.items.length).length}</b> Trainingstage · <b>${lines}</b> Zeilen · <b>${errs.length}</b> Fehler · <b>${problems.length - errs.length}</b> Hinweise</p>
+    $r.innerHTML = `<p><b>${data.weeks.length}</b> Wochen · <b>${days.filter((x) => x.items.length).length}</b> Trainingstage · <b>${days.filter((x) => !x.items.length && /^\s*frei\b/i.test(x.d.termine || "")).length}</b> frei · <b>${lines}</b> Zeilen · <b>${errs.length}</b> Fehler · <b>${problems.length - errs.length}</b> Hinweise</p>
       ${notYet.length ? `<p class="small muted">Noch nicht freigeschaltet: ${esc(notYet.join(", "))}. Ihr Plan wird trotzdem übernommen und erscheint, sobald du sie unter „Personen“ freischaltest.</p>` : ""}${problems.map((p) => `<div class="prob"><span class="pill ${p.level === "Fehler" ? "bad" : "warn"}">${p.level}</span><span>${esc(p.where)}: ${esc(p.text)}</span><code>${esc(p.cell || "")}</code></div>`).join("")}
       <div class="row"><button class="btn" id="go" ${errs.length ? "disabled" : ""}>In die Datenbank übernehmen</button>${errs.length ? `<span class="small muted">Erst die Fehler in der Excel beheben.</span>` : ""}</div><p class="small muted" id="prog"></p>`;
     if (errs.length) return;
@@ -534,14 +564,24 @@ async function uploadPane(me) {
       const ids = (exist || []).map((u) => u.id);
       const { data: docd } = ids.length ? await sb.from("diary_entries").select("unit_id").in("unit_id", ids) : { data: [] };
       const prot = new Set((docd || []).map((x) => x.unit_id));
-      let n = 0, skipped = 0;
+      let n = 0, skipped = 0, nFree = 0, removed = 0; const touched = new Set();
+      const FREI = /^\s*frei\b[\s:–—-]*/i;
       for (const { w, d, items } of days) {
+        const day = isoDay(d.date);
+        if (!items.length && FREI.test(d.termine || "")) { // trainingsfreier Tag
+          const ex = (exist || []).find((u) => u.date === day && u.slot === 1);
+          if (ex && (day < today || prot.has(ex.id))) { skipped++; touched.add(ex.id); continue; }
+          const { data: u, error } = await sb.from("units").upsert({ date: day, slot: 1, kw: w.kw, phase: w.phase, week_hint: w.hint, free: true, day_note: d.termine.replace(FREI, "").trim() || null }, { onConflict: "date,slot" }).select("id").single();
+          if (error) return ($g.textContent = `${day}: ${error.message}`);
+          touched.add(u.id); await sb.from("plan_lines").delete().eq("unit_id", u.id); nFree++; continue;
+        }
         if (!items.length) continue;
         for (const slot of [...new Set(items.map((i) => i.slot || 1))]) {
           const its = items.filter((i) => (i.slot || 1) === slot);
           const ex = (exist || []).find((u) => u.date === isoDay(d.date) && u.slot === slot);
-          if (ex && (isoDay(d.date) < today || prot.has(ex.id))) { skipped++; continue; } // vergangene oder dokumentierte Tage bleiben unverändert
-          const { data: u, error } = await sb.from("units").upsert({ date: isoDay(d.date), slot, kw: w.kw, phase: w.phase, week_hint: w.hint }, { onConflict: "date,slot" }).select("id").single();
+          if (ex && (isoDay(d.date) < today || prot.has(ex.id))) { skipped++; touched.add(ex.id); continue; } // vergangene oder dokumentierte Tage bleiben unverändert
+          const { data: u, error } = await sb.from("units").upsert({ date: isoDay(d.date), slot, kw: w.kw, phase: w.phase, week_hint: w.hint, free: false, day_note: null }, { onConflict: "date,slot" }).select("id").single();
+          touched.add(u?.id);
           if (error) return ($g.textContent = `${isoDay(d.date)}: ${error.message}`);
           await sb.from("plan_lines").delete().eq("unit_id", u.id);
           const { error: e2 } = await sb.from("plan_lines").insert(its.map((p) => ({ unit_id: u.id, position: p.pos, block: p.block, raw_text: p.raw, parsed: p, author_id: me.id, source_cell: p.cell })));
@@ -549,7 +589,10 @@ async function uploadPane(me) {
           n++; $g.textContent = `${n} Einheiten übernommen …`;
         }
       }
-      $g.textContent = `Fertig: ${n} Einheiten übernommen${skipped ? `, ${skipped} unverändert gelassen (vergangen oder schon dokumentiert)` : ""}. Unter „Freigabe“ gibst du neue Tage frei.`; toast("Plan übernommen");
+      // Künftige, undokumentierte Einheiten, die im neuen Plan nicht mehr vorkommen, entfernen
+      const stale = (exist || []).filter((u) => !touched.has(u.id) && u.date >= today && !prot.has(u.id)).map((u) => u.id);
+      if (stale.length) { await sb.from("plan_lines").delete().in("unit_id", stale); await sb.from("units").delete().in("id", stale); removed = stale.length; }
+      $g.textContent = `Fertig: ${n} Einheiten übernommen${nFree ? `, ${nFree} trainingsfreie Tage` : ""}${removed ? `, ${removed} nicht mehr geplante Einheiten entfernt` : ""}${skipped ? `, ${skipped} unverändert gelassen (vergangen oder schon dokumentiert)` : ""}. Unter „Freigabe“ gibst du neue Tage frei.`; toast("Plan übernommen");
     };
   };
 }
@@ -557,10 +600,10 @@ async function uploadPane(me) {
 async function releasePane() {
   const $p = document.getElementById("pane");
   const today = isoDay(new Date());
-  const { data: units } = await sb.from("units").select("id,date,slot,kw,released").gte("date", isoDay(new Date(Date.now() - 7 * 864e5))).order("date").order("slot").limit(40);
+  const { data: units } = await sb.from("units").select("id,date,slot,kw,released,free").gte("date", isoDay(new Date(Date.now() - 7 * 864e5))).order("date").order("slot").limit(40);
   $p.innerHTML = `<div class="card"><h3>Freigabe</h3><p class="muted">Athletinnen sehen freigegebene Tage bis einschließlich heute, nie künftige. Du kannst also ruhig im Voraus freigeben.</p>
     <div class="row"><label>Freigeben bis <input type="date" id="upto" value="${today}"></label><button class="btn" id="rel">Freigeben</button></div>
-    <div class="tablewrap"><table><thead><tr><th>Tag</th><th>KW</th><th>Status</th></tr></thead><tbody>${(units || []).map((u) => `<tr><td>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}</td><td>${u.kw ?? ""}</td><td>${u.released ? `<span class="pill ok">freigegeben</span>` : `<span class="pill">nicht freigegeben</span>`}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Noch keine Einheiten. Erst unter „Plan hochladen“ übernehmen.</td></tr>`}</tbody></table></div></div>`;
+    <div class="tablewrap"><table><thead><tr><th>Tag</th><th>KW</th><th>Status</th></tr></thead><tbody>${(units || []).map((u) => `<tr><td>${dShort(u.date)}${u.slot === 2 ? " E2" : ""}${u.free ? ' <span class="pill">frei</span>' : ""}</td><td>${u.kw ?? ""}</td><td>${u.released ? `<span class="pill ok">freigegeben</span>` : `<span class="pill">nicht freigegeben</span>`}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">Noch keine Einheiten. Erst unter „Plan hochladen“ übernehmen.</td></tr>`}</tbody></table></div></div>`;
   document.getElementById("rel").onclick = async () => {
     const upto = document.getElementById("upto").value;
     const { error } = await sb.from("units").update({ released: true, released_at: new Date().toISOString() }).lte("date", upto).eq("released", false);
@@ -726,7 +769,7 @@ async function diaryPane(me) {
   if (canWrite(me)) document.getElementById("dpdev").onclick = () => deviationForm(document.getElementById("dpform"), me, people, sel, "Sonstiges");
   const ath = people.find((p) => p.id === sel);
   const since = isoDay(new Date(Date.now() - 21 * 864e5)), today = isoDay(new Date());
-  const { data: allUnits } = await sb.from("units").select("id,date,slot").gte("date", since).lte("date", today).eq("released", true).order("date", { ascending: false }).order("slot");
+  const { data: allUnits } = await sb.from("units").select("id,date,slot,free,day_note").gte("date", since).lte("date", today).eq("released", true).order("date", { ascending: false }).order("slot");
   const units = (allUnits || []).filter((u) => seesDay(ath, u.date));
   const ids = units.map((u) => u.id);
   if (!ids.length) return (document.getElementById("dplist").innerHTML = `<p class="muted">In den letzten drei Wochen wurde nichts freigegeben.</p>`);
@@ -738,6 +781,7 @@ async function diaryPane(me) {
   ]);
   const rm0 = {}; for (const t of tests || []) if (t.exercise_name && !(t.exercise_name in rm0)) rm0[t.exercise_name] = Number(t.value);
   document.getElementById("dplist").innerHTML = units.map((u) => {
+    if (u.free) return `<div class="card free-mini"><p><b>${dShort(u.date)}</b> · trainingsfrei${u.day_note ? " – " + esc(u.day_note) : ""}</p></div>`;
     const e = (entries || []).find((x) => x.unit_id === u.id);
     const its = (lines || []).filter((l) => l.unit_id === u.id).map((l) => ({ ...l.parsed, lineId: l.id, pos: l.position ?? l.parsed.pos, block: l.block })).sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99));
     const pr = applyProfile(its, (profiles || []).find((x) => x.code === ath.profile_code), ath.sex);
