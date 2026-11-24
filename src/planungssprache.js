@@ -35,7 +35,10 @@ export function mergeCatalog(base, sheet) {
     const where = `Übungskatalog Zeile ${x.row}`;
     if (!HAUPTBLOECKE.includes(x.block)) { problems.push({ level: "Fehler", text: `${where}: „${x.name}“ hat ${x.block ? `den unbekannten Hauptblock „${x.block}“` : "keinen Hauptblock"}`, cell: where }); continue; }
     const k = norm(x.name);
-    if (seen.has(k)) { problems.push({ level: "Hinweis", text: `${where}: „${x.name}“ steht doppelt (auch Zeile ${seen.get(k)}); die erste Zeile gilt`, cell: where }); continue; }
+    if (seen.has(k)) { // doppelte Übung: Schreibweisen übernehmen, Angaben der ersten Zeile gelten
+      const first = entries.find((e) => norm(e.name) === k);
+      for (const al of x.aliases) if (!first.aliases.some((y) => norm(y) === norm(al))) { const o = aliasOwner.get(norm(al)); if (!o) { first.aliases.push(al); aliasOwner.set(norm(al), first.name); } }
+      problems.push({ level: "Hinweis", text: `${where}: „${x.name}“ steht doppelt (auch Zeile ${seen.get(k)}); Schreibweisen werden zusammengeführt, Hauptblock und Zählart der ersten Zeile gelten`, cell: where }); continue; }
     seen.set(k, x.row);
     const b = byName.get(k);
     const aliases = [...new Set([...x.aliases, ...(b?.aliases || [])])];
