@@ -42,7 +42,7 @@ export function mergeCatalog(base, sheet) {
     seen.set(k, x.row);
     const b = byName.get(k);
     const aliases = [...new Set([...x.aliases, ...(b?.aliases || [])])];
-    for (const a of [x.name, ...aliases]) { const n = norm(a); const o = aliasOwner.get(n); if (o && o !== x.name) problems.push({ level: "Hinweis", text: `${where}: Schreibweise „${a}“ (bei „${x.name}“) gehört schon zu „${o}“ – im Plan wird dafür „${o}“ erkannt`, cell: where }); else aliasOwner.set(n, x.name); }
+    for (const a of [...new Set([x.name, ...aliases].map((v) => v.trim()))]) { const n = norm(a); const o = aliasOwner.get(n); if (o && o !== x.name) problems.push({ level: "Hinweis", text: `${where}: Schreibweise „${a}“ (bei „${x.name}“) gehört schon zu „${o}“ – im Plan wird dafür „${o}“ erkannt`, cell: where }); else aliasOwner.set(n, x.name); }
     entries.push({ ...(b || {}), name: x.name, block: x.block, count: x.count || b?.count || "", rm: x.rm, status: x.status, aliases });
   }
   for (const e of base) if (!seen.has(norm(e.name))) entries.push(e);
