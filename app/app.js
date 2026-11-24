@@ -529,8 +529,8 @@ async function uploadPane(me) {
     catch (e) { return ($r.innerHTML = `<p>Datei konnte nicht gelesen werden: ${esc(e.message)}</p>`); }
     const mc = mergeCatalog((await cat()).entries, data.catalog); // Blatt „Übungskatalog“ der Excel gilt, Position egal
     const c = makeCatalog(mc.entries);
-    const { data: ppl } = await sb.from("people").select("name").eq("role", "athletin");
-    const athletes = (ppl || []).map((p) => p.name);
+    const { data: ppl } = await sb.from("people").select("name,preview").eq("role", "athletin");
+    const athletes = (ppl || []).filter((p) => !p.preview).map((p) => p.name); // Testkonten (Vorschau) nicht prüfen
     const notYet = data.athletes.filter((n) => !athletes.includes(n));
     const days = []; const problems = [...mc.problems];
     for (const w of data.weeks) w.days.forEach((d, di) => {
