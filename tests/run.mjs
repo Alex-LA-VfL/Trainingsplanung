@@ -56,6 +56,9 @@ if (P) {
     ? ok("Übungskatalog aus der Excel wird übernommen") : fail("Übungskatalog aus der Excel: " + JSON.stringify({ errs, item: r.items[0]?.exercise?.name, mc: mc.problems }));
 }
 
+// 2c · Wurfanzahl "3x10" → 30
+if (P) { const t = P.throwCount; [["10", 10], ["3x10", 30], ["3 × 10", 30], ["2x8 + 5", 21], ["abc", null], ["", null]].every(([a, b]) => t(a) === b) ? ok("Wurfanzahl 3x10 wird als 30 gezählt") : fail("Wurfanzahl falsch gezählt"); }
+
 // 3 · App-Start
 const els = {};
 const mk = (id) => ({ id, innerHTML: "", textContent: "", hidden: false, value: "", scrollLeft: 0, scrollWidth: 0, querySelectorAll: () => [], querySelector: () => mk(),

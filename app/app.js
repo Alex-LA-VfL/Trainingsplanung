@@ -1,6 +1,6 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { makeCatalog, parseDay, planFor, applyProfile, HAUPTBLOECKE, mergeCatalog } from "../src/planungssprache.js";
+import { makeCatalog, parseDay, planFor, applyProfile, HAUPTBLOECKE, mergeCatalog, throwCount } from "../src/planungssprache.js";
 import { readWorkbook, isoDay, TAGE } from "../src/excel.js";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -226,7 +226,7 @@ async function dayForm(me, unit, onSaved) {
       else if (e.test) html += `<label class="ist">Maximalgewicht kg <input data-test="${esc(e.name)}" data-ist="${esc(key)}" inputmode="decimal" value="${esc(old?.actual?.ist ?? "")}"></label>`;
       else if (b.doku === "Würfe") {
         const rows = old?.actual?.wuerfe?.length ? old.actual.wuerfe : [{ form: "", geraet: "", n: "" }];
-        html += `<div class="throws" data-throws="${esc(key)}">${rows.map((r) => `<div class="tr"><input placeholder="Wurfform" value="${esc(r.form)}"><input placeholder="Gerät" value="${esc(r.geraet)}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n)}"></div>`).join("")}<button type="button" class="btn ghost" data-addrow>+ Wurfform</button></div>${chipHTML("t:" + key, CHIPS_TECHNIK, new Set(old?.chips || []))}`;
+        html += `<div class="throws" data-throws="${esc(key)}">${rows.map((r) => `<div class="tr"><input placeholder="Wurfform" value="${esc(r.form)}"><input placeholder="Gerät" value="${esc(r.geraet)}"><input placeholder="Würfe, z. B. 3x10" value="${esc(r.n)}"></div>`).join("")}<button type="button" class="btn ghost" data-addrow>+ Wurfform</button></div>${chipHTML("t:" + key, CHIPS_TECHNIK, new Set(old?.chips || []))}`;
       }
       if (sc === 5 && b.doku !== "je Übung" && !e.test && b.doku !== "Set" && b.doku !== "Würfe" && !SET_RATED.has(b.block)) html += `<label class="check"><input type="checkbox" data-done="${esc(key)}" ${old?.actual?.done ? "checked" : ""}> erledigt</label>`;
       html += `</div>`;
@@ -277,7 +277,7 @@ async function dayForm(me, unit, onSaved) {
   absentView();
   const addRow = (box, r = {}) => {
     const row = document.createElement("div"); row.className = "tr";
-    row.innerHTML = `<input placeholder="Wurfform" value="${esc(r.form || "")}"><input placeholder="Gerät" value="${esc(r.geraet || "")}"><input placeholder="Würfe" inputmode="numeric" value="${esc(r.n || "")}">`;
+    row.innerHTML = `<input placeholder="Wurfform" value="${esc(r.form || "")}"><input placeholder="Gerät" value="${esc(r.geraet || "")}"><input placeholder="Würfe, z. B. 3x10" value="${esc(r.n || "")}">`;
     box.querySelector("[data-addrow]").before(row); return row;
   };
   $d.querySelectorAll("[data-addrow]").forEach((b) => (b.onclick = () => { addRow(b.parentElement).querySelector("input").focus(); }));
@@ -355,7 +355,7 @@ async function dayForm(me, unit, onSaved) {
       for (const [k, v] of Object.entries(snap.ist)) get(k).actual.ist = v;
       for (const [k, v] of Object.entries(snap.kg)) get(k).actual.kg = v.trim() ? Number(v.replace(",", ".")) : null;
       for (const [k, v] of Object.entries(snap.done)) get(k).actual.done = v;
-      for (const [k, v] of Object.entries(snap.throws)) { const it = get(k); it.actual.wuerfe = v.filter((r) => r.form || r.n); it.chips = snap.chips["t:" + k] || []; }
+      for (const [k, v] of Object.entries(snap.throws)) { const it = get(k); it.actual.wuerfe = v.filter((r) => r.form || r.n).map((r) => ({ ...r, count: throwCount(r.n) })); /* "3x10" → count 30 */ it.chips = snap.chips["t:" + k] || []; }
       // Übersprungene Blöcke: Einzelangaben verwerfen, nur Vermerk mit Grund speichern
       const skipLines = new Set(snap.skiplines || []);
       for (const [k, it] of items) if (skipLines.has(it.plan_line_id)) items.delete(k);
@@ -799,7 +799,7 @@ async function diaryPane(me) {
       return `<div class="blk"><h3>${esc(b.block)}${setI?.rating != null ? dot(setI.rating, rsc) : ""}${doneI?.done ? '<span class="pill ok">✓ erledigt</span>' : ""}</h3>${b.items.map((x) => {
         const i = di.get(`${x.lineId}|${x.name}`); const a = i?.actual || {};
         const ist = [a.ist && a.ist !== x.dose.split(" · ")[0] ? `Ist ${a.ist}` : "", a.kg != null ? `${String(a.kg).replace(".", ",")} kg` : "", a.done === true ? "✓" : a.done === false ? "nicht erledigt" : "",
-          (a.wuerfe || []).map((w) => `${w.form || "Würfe"}${w.geraet ? " (" + w.geraet + ")" : ""}: ${w.n}`).join(" · "), (i?.chips || []).join(", ")].filter(Boolean).join(" · ");
+          (a.wuerfe || []).map((w) => { const c = w.count ?? throwCount(w.n); return `${w.form || "Würfe"}${w.geraet ? " (" + w.geraet + ")" : ""}: ${w.n}${c != null && String(c) !== String(w.n).trim() ? " = " + c : ""}`; }).join(" · "), (i?.chips || []).join(", ")].filter(Boolean).join(" · ");
         return `<div class="item"><div class="ihead"><span class="iname">${x.replaced ? `<span class="tag">statt ${esc(x.replaced)}</span>` : ""}${esc(x.name)}</span><span class="idose">${esc(x.dose)}</span></div>${ist || i?.rating != null ? `<div class="idetail">${i?.rating != null ? dot(i.rating, rsc) + " " : ""}${esc(ist)}</div>` : ""}</div>`;
       }).join("")}</div>`;
     }).join("");

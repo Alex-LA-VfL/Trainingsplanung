@@ -49,6 +49,19 @@ export function mergeCatalog(base, sheet) {
   return { entries, problems };
 }
 
+/** Wurfanzahl aus freier Eingabe: "10", "3x10", "3 × 10", "2x8 + 5" → Summe; unlesbar → null */
+export function throwCount(input) {
+  const t = String(input ?? "").trim().replace(/,/g, ".");
+  if (!t) return null;
+  let sum = 0;
+  for (const part of t.split("+")) {
+    const m = part.trim().match(/^(\d+)\s*(?:[x×*]\s*(\d+))?$/i);
+    if (!m) return null;
+    sum += m[2] ? Number(m[1]) * Number(m[2]) : Number(m[1]);
+  }
+  return sum;
+}
+
 /** Übungskatalog mit Schreibweisen → Nachschlagefunktion */
 export function makeCatalog(entries) {
   const map = new Map();
